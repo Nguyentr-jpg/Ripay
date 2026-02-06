@@ -210,6 +210,31 @@ const parseLinks = (raw) => {
     .filter(Boolean);
 };
 
+const normalizeImageUrl = (url) => {
+  if (!url) return "";
+
+  if (url.includes("dropbox.com")) {
+    if (url.includes("?raw=1")) return url;
+    if (url.includes("?dl=0") || url.includes("?dl=1")) {
+      return url.replace(/\?dl=[01]/, "?raw=1");
+    }
+    return `${url}${url.includes("?") ? "&" : "?"}raw=1`;
+  }
+
+  if (url.includes("drive.google.com")) {
+    const fileMatch = url.match(/\/file\/d\/([^/]+)/);
+    if (fileMatch) {
+      return `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
+    }
+    const openMatch = url.match(/[?&]id=([^&]+)/);
+    if (openMatch) {
+      return `https://drive.google.com/uc?export=view&id=${openMatch[1]}`;
+    }
+  }
+
+  return url;
+};
+
 const isImageUrl = (url) =>
   /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
 
@@ -222,7 +247,9 @@ const openGallery = (orderId) => {
 
   const grid = el("galleryGrid");
   grid.innerHTML = "";
-  const links = order.items ? order.items.flatMap((item) => parseLinks(item.link)) : [];
+  const links = order.items
+    ? order.items.flatMap((item) => parseLinks(item.link).map(normalizeImageUrl))
+    : [];
   const previewCount = links.length
     ? links.length
     : Math.min(order.totalCount, 16);
@@ -234,7 +261,7 @@ const openGallery = (orderId) => {
       item.style.backgroundImage = `url('${links[i]}')`;
       item.dataset.src = links[i];
     } else if (links[i]) {
-      item.dataset.src = links[i];
+      item.dataset.src = "";
       item.classList.add("link-only");
     }
     item.addEventListener("click", () => openLightbox(item.dataset.src));
@@ -252,14 +279,11 @@ const closeGallery = () => {
 const openLightbox = (src) => {
   if (src && isImageUrl(src)) {
     el("lightboxImg").src = src;
-  } else if (src) {
-    window.open(src, "_blank");
+    el("lightbox").classList.remove("hidden");
     return;
-  } else {
-    el("lightboxImg").src =
-      "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='1000'><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop stop-color='%23f7e8dc'/><stop offset='1' stop-color='%23f1d6bf'/></linearGradient></defs><rect width='1600' height='1000' fill='url(%23g)'/><text x='50%25' y='50%25' font-size='64' font-family='Arial' fill='rgba(0,0,0,0.45)' text-anchor='middle' dominant-baseline='middle'>RIPAY PREVIEW</text></svg>";
   }
-  el("lightbox").classList.remove("hidden");
+
+  alert("Please use direct image links (.jpg/.png) or Dropbox/Drive file links.");
 };
 
 const closeLightbox = () => {

@@ -485,7 +485,7 @@ main {
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -514,7 +514,25 @@ main {
 }
 
 .gallery-item.link-only::after {
-  content: "OPEN LINK";
+  content: "DIRECT IMAGE REQUIRED";
+}
+
+.lightbox-content {
+  position: relative;
+}
+
+.lightbox-content::after {
+  content: "RIPAY PREVIEW";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  letter-spacing: 6px;
+  color: rgba(255, 255, 255, 0.25);
+  text-transform: uppercase;
+  transform: rotate(-20deg);
+  pointer-events: none;
 }
 
 .lightbox {
@@ -604,7 +622,16 @@ main {
   display: none;
 }
 
+@media (max-width: 1200px) {
+  .gallery-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
+  .gallery-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .dashboard {
     grid-template-columns: 1fr;
   }
@@ -619,5 +646,17 @@ main {
   .order-row div:nth-child(4),
   .order-row div:nth-child(5) {
     grid-column: span 3;
+  }
+}
+
+@media (max-width: 700px) {
+  .gallery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .gallery-grid {
+    grid-template-columns: 1fr;
   }
 }
