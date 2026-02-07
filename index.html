@@ -117,7 +117,7 @@
                 </div>
                 <div class="order-table">
                   <div class="order-row order-header">
-                    <div></div>
+                    <div><input type="checkbox" id="selectAll" /></div>
                     <div>Order name</div>
                     <div>Order ID</div>
                     <div>Client ID</div>
@@ -187,6 +187,7 @@
         <div id="galleryGrid" class="gallery-grid"></div>
         <div class="modal-actions">
           <button id="btnDeleteOrder" class="btn ghost danger">Delete order</button>
+          <button id="btnEditOrder" class="btn ghost">Edit</button>
           <button id="btnPaySingle" class="btn primary">Pay</button>
         </div>
       </div>
@@ -287,6 +288,34 @@
         </div>
         <div class="modal-actions">
           <button id="btnFeedback" class="btn primary">Submit feedback</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <div id="editModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-head">
+          <div>
+            <h3>Edit Order</h3>
+            <div class="modal-sub">Update order details.</div>
+          </div>
+          <button id="btnCloseEdit" class="btn ghost">Close</button>
+        </div>
+        <div class="form-card">
+          <div class="field">
+            <span>Order name</span>
+            <input id="editOrderName" type="text" placeholder="Order name" />
+          </div>
+          <div class="field">
+            <span>Items</span>
+            <div id="editLineItems"></div>
+            <button id="btnEditAddLine" class="btn ghost">+ Add item</button>
+          </div>
+          <div class="modal-actions">
+            <button id="btnSaveEdit" class="btn primary">Save changes</button>
+          </div>
         </div>
       </div>
     </div>

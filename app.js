@@ -7,10 +7,30 @@ const state = {
   payments: [],
   selectedOrders: new Set(),
   activeOrderId: null,
+  editingOrderId: null,
   payQueue: [],
 };
 
 const el = (id) => document.getElementById(id);
+
+const showToast = (message, type = "info") => {
+  const container = el("toastContainer");
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("fade-out");
+    toast.addEventListener("animationend", () => toast.remove());
+  }, 3000);
+};
+
+const escapeHtml = (str) => {
+  if (!str) return "";
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+};
 
 const seedData = () => ({
   orders: [
@@ -163,18 +183,18 @@ const renderOrders = () => {
     const checked = state.selectedOrders.has(order.id) ? "checked" : "";
     row.innerHTML = `
       <div>
-        <input type="checkbox" data-id="${order.id}" ${checked} />
+        <input type="checkbox" data-id="${escapeHtml(order.id)}" ${checked} />
       </div>
       <div>
-        <div class="order-name">${order.name}</div>
-        <div class="hint">${order.createdAt}</div>
+        <div class="order-name">${escapeHtml(order.name)}</div>
+        <div class="hint">${escapeHtml(order.createdAt)}</div>
       </div>
-      <div>${order.id}</div>
-      <div>${order.clientId || "CLI-00000"}</div>
+      <div>${escapeHtml(order.id)}</div>
+      <div>${escapeHtml(order.clientId || "CLI-00000")}</div>
       <div>${order.totalCount}</div>
       <div>${formatStatus(order.status)}</div>
       <div>
-        <button class="btn ghost" data-view="${order.id}">View</button>
+        <button class="btn ghost" data-view="${escapeHtml(order.id)}">View</button>
       </div>
     `;
 
@@ -197,12 +217,16 @@ const renderPayments = () => {
     .forEach((payment) => {
       const row = document.createElement("div");
       row.className = "payment-row";
+      const orderName = payment.orderName || (state.orders.find((o) => o.id === payment.orderId)?.name) || "";
       row.innerHTML = `
-        <div>${payment.date}</div>
-        <div>${payment.status}</div>
-        <div>${payment.customerId}</div>
+        <div>${escapeHtml(payment.date)}</div>
+        <div>${escapeHtml(payment.status)}</div>
+        <div>${escapeHtml(payment.customerId)}</div>
         <div>$${Number(payment.amount || 0).toFixed(2)}</div>
-        <div>${payment.orderId}</div>
+        <div>
+          <div>${escapeHtml(payment.orderId)}</div>
+          <div class="hint">${escapeHtml(orderName)}</div>
+        </div>
       `;
       list.appendChild(row);
     });
@@ -308,15 +332,15 @@ const renderOrderDetail = (order) => {
   detail.innerHTML = `
     <div class="order-detail-item">
       <div class="detail-label">Order ID</div>
-      <div class="detail-value">${order.id}</div>
+      <div class="detail-value">${escapeHtml(order.id)}</div>
     </div>
     <div class="order-detail-item">
       <div class="detail-label">Client</div>
-      <div class="detail-value">${order.clientName || order.clientId || "—"}</div>
+      <div class="detail-value">${escapeHtml(order.clientName || order.clientId || "—")}</div>
     </div>
     <div class="order-detail-item">
       <div class="detail-label">Items</div>
-      <div class="detail-value">${itemsSummary}</div>
+      <div class="detail-value">${escapeHtml(itemsSummary)}</div>
     </div>
     <div class="order-detail-item">
       <div class="detail-label">Amount</div>
@@ -328,7 +352,7 @@ const renderOrderDetail = (order) => {
     </div>
     <div class="order-detail-item">
       <div class="detail-label">Created</div>
-      <div class="detail-value">${order.createdAt}</div>
+      <div class="detail-value">${escapeHtml(order.createdAt)}</div>
     </div>
   `;
 };
@@ -379,7 +403,7 @@ const openLightbox = (src) => {
     return;
   }
 
-  alert("Link này không hiển thị được. Hãy dùng link ảnh trực tiếp hoặc link file Dropbox/Google Drive.");
+  showToast("Link này không hiển thị được. Hãy dùng link ảnh trực tiếp hoặc link file Dropbox/Google Drive.", "error");
 };
 
 const closeLightbox = () => {
@@ -444,6 +468,7 @@ const markPaid = (orderIds) => {
       status: "Paid",
       customerId: `CUS-${Math.floor(Math.random() * 90000 + 10000)}`,
       orderId: order.id,
+      orderName: order.name,
       amount,
     });
   });
@@ -493,7 +518,7 @@ const createOrder = () => {
   });
 
   if (!newOrders.length) {
-    alert("Please enter at least one order name and quantity.");
+    showToast("Please enter at least one order name and quantity.", "error");
     return;
   }
 
@@ -503,6 +528,95 @@ const createOrder = () => {
 
   renderLineItems();
   switchTab("overview");
+};
+
+const addEditLineItem = (item = { type: "", count: 0, link: "", unitPrice: 0 }) => {
+  const container = el("editLineItems");
+  const row = document.createElement("div");
+  row.className = "line-item";
+  row.dataset.unitPrice = item.unitPrice || 0;
+  row.innerHTML = `
+    <input type="text" placeholder="Item type" value="${escapeHtml(item.type)}" />
+    <div class="quantity-wrap">
+      <input type="number" min="1" placeholder="Qty" value="${item.count || ""}" />
+      <button class="price-btn" data-price>...</button>
+      <div class="price-hint">Unit price: $<span>${Number(item.unitPrice || 0).toFixed(2)}</span></div>
+    </div>
+    <input type="text" placeholder="Link" value="${escapeHtml(item.link)}" />
+    <button class="btn ghost" data-remove>–</button>
+  `;
+
+  row.querySelector("[data-price]").addEventListener("click", () => {
+    const current = row.dataset.unitPrice || 0;
+    const next = prompt("Enter unit price", current);
+    if (next === null) return;
+    const value = Math.max(0, Number(next));
+    row.dataset.unitPrice = value;
+    row.querySelector(".price-hint span").textContent = value.toFixed(2);
+  });
+
+  row.querySelector("[data-remove]").addEventListener("click", () => row.remove());
+  container.appendChild(row);
+};
+
+const openEditModal = (orderId) => {
+  const order = state.orders.find((o) => o.id === orderId);
+  if (!order) return;
+
+  state.editingOrderId = orderId;
+  el("editOrderName").value = order.name;
+  el("editLineItems").innerHTML = "";
+
+  if (order.items && order.items.length) {
+    order.items.forEach((item) => addEditLineItem(item));
+  } else {
+    addEditLineItem();
+  }
+
+  el("editModal").classList.remove("hidden");
+};
+
+const closeEditModal = () => {
+  el("editModal").classList.add("hidden");
+  state.editingOrderId = null;
+};
+
+const saveEditOrder = () => {
+  const order = state.orders.find((o) => o.id === state.editingOrderId);
+  if (!order) return;
+
+  const name = el("editOrderName").value.trim();
+  if (!name) {
+    showToast("Order name is required.", "error");
+    return;
+  }
+
+  const rows = Array.from(el("editLineItems").children);
+  const items = rows.map((row) => {
+    const inputs = row.querySelectorAll("input");
+    return {
+      type: inputs[0].value.trim(),
+      count: Number(inputs[1].value || 0),
+      link: inputs[2].value.trim(),
+      unitPrice: Number(row.dataset.unitPrice || 0),
+    };
+  }).filter((item) => item.type && item.count > 0);
+
+  if (!items.length) {
+    showToast("At least one item with name and quantity is required.", "error");
+    return;
+  }
+
+  order.name = name;
+  order.items = items;
+  order.totalCount = items.reduce((sum, i) => sum + i.count, 0);
+  order.totalAmount = items.reduce((sum, i) => sum + i.count * i.unitPrice, 0);
+
+  saveState();
+  closeEditModal();
+  closeGallery();
+  renderOrders();
+  showToast("Order updated successfully.", "success");
 };
 
 const switchTab = (tab) => {
@@ -518,7 +632,7 @@ const setupEvents = () => {
   el("btnLogin").addEventListener("click", () => {
     const name = el("loginEmail").value.trim();
     if (!name) {
-      alert("Please enter your email.");
+      showToast("Please enter your email.", "error");
       return;
     }
     state.user = name;
@@ -567,11 +681,13 @@ const setupEvents = () => {
     const order = state.orders.find((o) => o.id === state.activeOrderId);
     if (!order) return;
     if (!confirm(`Delete order "${order.name}"?`)) return;
+    const deletedName = order.name;
     state.orders = state.orders.filter((o) => o.id !== state.activeOrderId);
     state.selectedOrders.delete(state.activeOrderId);
     saveState();
     closeGallery();
     renderOrders();
+    showToast(`Order "${deletedName}" deleted.`, "info");
   });
 
   el("btnPaySingle").addEventListener("click", () => {
@@ -583,7 +699,7 @@ const setupEvents = () => {
   el("btnBulkPay").addEventListener("click", () => {
     const ids = Array.from(state.selectedOrders);
     if (!ids.length) {
-      alert("Please select orders to pay.");
+      showToast("Please select orders to pay.", "error");
       return;
     }
     openPayModal(ids);
@@ -592,9 +708,11 @@ const setupEvents = () => {
   el("btnClosePay").addEventListener("click", closePayModal);
   el("btnConfirmPay").addEventListener("click", () => {
     if (!state.payQueue.length) return;
+    const count = state.payQueue.length;
     markPaid(state.payQueue);
     state.selectedOrders.clear();
     closePayModal();
+    showToast(`Payment confirmed for ${count} order${count > 1 ? "s" : ""}.`, "success");
   });
 
   el("btnCloseLightbox").addEventListener("click", closeLightbox);
@@ -625,7 +743,7 @@ const setupEvents = () => {
     state.subscribed = true;
     saveState();
     el("subModal").classList.add("hidden");
-    alert("Subscription activated. You can now create orders.");
+    showToast("Subscription activated. You can now create orders.", "success");
   });
 
   document.querySelectorAll(".chip").forEach((chip) => {
@@ -640,18 +758,18 @@ const setupEvents = () => {
     const email = el("feedbackEmail").value.trim();
     const message = el("feedbackMessage").value.trim();
     if (!email) {
-      alert("Please enter your email.");
+      showToast("Please enter your email.", "error");
       return;
     }
     if (!message) {
-      alert("Please enter a message.");
+      showToast("Please enter a message.", "error");
       return;
     }
     el("feedbackEmail").value = "";
     el("feedbackMessage").value = "";
     document.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     el("feedbackModal").classList.add("hidden");
-    alert("Thanks for your feedback! We'll get back to you soon.");
+    showToast("Thanks for your feedback! We'll get back to you soon.", "success");
   });
 
   el("orderSearch").addEventListener("input", () => renderOrders());
@@ -675,11 +793,53 @@ const setupEvents = () => {
   });
 
   el("btnExportPayments").addEventListener("click", () => {
-    const rows = [["Payment ID", "Date", "Status", "Customer ID", "Order ID", "Amount"]];
+    const rows = [["Payment ID", "Date", "Status", "Customer ID", "Order ID", "Order Name", "Amount"]];
     state.payments.forEach((p) => {
-      rows.push([p.id, p.date, p.status, p.customerId, p.orderId, Number(p.amount || 0).toFixed(2)]);
+      const orderName = p.orderName || (state.orders.find((o) => o.id === p.orderId)?.name) || "";
+      rows.push([p.id, p.date, p.status, p.customerId, p.orderId, `"${orderName}"`, Number(p.amount || 0).toFixed(2)]);
     });
     downloadCSV(rows, "renpay-payments.csv");
+  });
+
+  // Edit order
+  el("btnEditOrder").addEventListener("click", () => {
+    if (!state.activeOrderId) return;
+    closeGallery();
+    openEditModal(state.activeOrderId);
+  });
+
+  el("btnCloseEdit").addEventListener("click", closeEditModal);
+  el("btnSaveEdit").addEventListener("click", saveEditOrder);
+  el("btnEditAddLine").addEventListener("click", () => addEditLineItem());
+
+  // Select all checkbox
+  el("selectAll").addEventListener("change", (event) => {
+    const filtered = getFilteredOrders();
+    if (event.target.checked) {
+      filtered.forEach((o) => state.selectedOrders.add(o.id));
+    } else {
+      filtered.forEach((o) => state.selectedOrders.delete(o.id));
+    }
+    renderOrders();
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (!el("lightbox").classList.contains("hidden")) {
+        closeLightbox();
+      } else if (!el("payModal").classList.contains("hidden")) {
+        closePayModal();
+      } else if (!el("editModal").classList.contains("hidden")) {
+        closeEditModal();
+      } else if (!el("galleryModal").classList.contains("hidden")) {
+        closeGallery();
+      } else if (!el("subModal").classList.contains("hidden")) {
+        el("subModal").classList.add("hidden");
+      } else if (!el("feedbackModal").classList.contains("hidden")) {
+        el("feedbackModal").classList.add("hidden");
+      }
+    }
   });
 };
 
