@@ -83,6 +83,17 @@ const saveState = () => {
   );
 };
 
+const downloadCSV = (rows, filename) => {
+  const csv = rows.map((r) => r.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 const formatStatus = (status) => {
   const isPaid = status === "paid";
   return `<span class="badge ${isPaid ? "paid" : "unpaid"}">${
@@ -90,16 +101,62 @@ const formatStatus = (status) => {
   }</span>`;
 };
 
+const renderStats = () => {
+  const row = el("statsRow");
+  const total = state.orders.length;
+  const unpaid = state.orders.filter((o) => o.status === "unpaid");
+  const paid = state.orders.filter((o) => o.status === "paid");
+  const revenue = paid.reduce((sum, o) => sum + getOrderAmount(o), 0);
+  const pending = unpaid.reduce((sum, o) => sum + getOrderAmount(o), 0);
+
+  row.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total orders</div>
+      <div class="stat-value">${total}</div>
+    </div>
+    <div class="stat-card highlight">
+      <div class="stat-label">Revenue collected</div>
+      <div class="stat-value">$${revenue.toFixed(2)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Unpaid orders</div>
+      <div class="stat-value">${unpaid.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending amount</div>
+      <div class="stat-value">$${pending.toFixed(2)}</div>
+    </div>
+  `;
+};
+
+const getFilteredOrders = () => {
+  const search = (el("orderSearch")?.value || "").toLowerCase().trim();
+  const statusFilter = el("orderStatusFilter")?.value || "all";
+
+  return state.orders.filter((order) => {
+    if (statusFilter !== "all" && order.status !== statusFilter) return false;
+    if (search) {
+      const haystack = `${order.name} ${order.id} ${order.clientId || ""} ${order.clientName || ""}`.toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+};
+
 const renderOrders = () => {
   const list = el("orderList");
   list.innerHTML = "";
 
-  if (!state.orders.length) {
-    list.innerHTML = `<div class="order-row"><div></div><div>No orders yet.</div><div></div><div></div><div></div></div>`;
+  renderStats();
+
+  const filtered = getFilteredOrders();
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="order-row"><div></div><div>No orders found.</div><div></div><div></div><div></div><div></div><div></div></div>`;
     return;
   }
 
-  state.orders.forEach((order) => {
+  filtered.forEach((order) => {
     const row = document.createElement("div");
     row.className = "order-row";
 
@@ -241,12 +298,48 @@ const isImageUrl = (url) =>
 const isPreviewHost = (url) =>
   /dropbox\.com|drive\.google\.com|googleusercontent\.com/i.test(url);
 
+const renderOrderDetail = (order) => {
+  const detail = el("orderDetail");
+  const amount = getOrderAmount(order);
+  const itemsSummary = order.items
+    ? order.items.map((i) => `${i.type} (x${i.count})`).join(", ")
+    : `${order.totalCount} items`;
+
+  detail.innerHTML = `
+    <div class="order-detail-item">
+      <div class="detail-label">Order ID</div>
+      <div class="detail-value">${order.id}</div>
+    </div>
+    <div class="order-detail-item">
+      <div class="detail-label">Client</div>
+      <div class="detail-value">${order.clientName || order.clientId || "—"}</div>
+    </div>
+    <div class="order-detail-item">
+      <div class="detail-label">Items</div>
+      <div class="detail-value">${itemsSummary}</div>
+    </div>
+    <div class="order-detail-item">
+      <div class="detail-label">Amount</div>
+      <div class="detail-value">$${amount.toFixed(2)}</div>
+    </div>
+    <div class="order-detail-item">
+      <div class="detail-label">Status</div>
+      <div class="detail-value">${formatStatus(order.status)}</div>
+    </div>
+    <div class="order-detail-item">
+      <div class="detail-label">Created</div>
+      <div class="detail-value">${order.createdAt}</div>
+    </div>
+  `;
+};
+
 const openGallery = (orderId) => {
   const order = state.orders.find((o) => o.id === orderId);
   if (!order) return;
 
   state.activeOrderId = orderId;
   el("galleryTitle").textContent = order.name;
+  renderOrderDetail(order);
 
   const grid = el("galleryGrid");
   grid.innerHTML = "";
@@ -296,6 +389,12 @@ const closeLightbox = () => {
 
 const openPayModal = (orderIds) => {
   state.payQueue = orderIds;
+  const total = orderIds.reduce((sum, id) => {
+    const order = state.orders.find((o) => o.id === id);
+    return sum + (order ? getOrderAmount(order) : 0);
+  }, 0);
+  const count = orderIds.length;
+  el("payTotal").textContent = `Total: $${total.toFixed(2)} for ${count} order${count > 1 ? "s" : ""}`;
   el("payModal").classList.remove("hidden");
 };
 
@@ -462,6 +561,19 @@ const setupEvents = () => {
   });
 
   el("btnCloseGallery").addEventListener("click", closeGallery);
+
+  el("btnDeleteOrder").addEventListener("click", () => {
+    if (!state.activeOrderId) return;
+    const order = state.orders.find((o) => o.id === state.activeOrderId);
+    if (!order) return;
+    if (!confirm(`Delete order "${order.name}"?`)) return;
+    state.orders = state.orders.filter((o) => o.id !== state.activeOrderId);
+    state.selectedOrders.delete(state.activeOrderId);
+    saveState();
+    closeGallery();
+    renderOrders();
+  });
+
   el("btnPaySingle").addEventListener("click", () => {
     if (!state.activeOrderId) return;
     closeGallery();
@@ -540,6 +652,34 @@ const setupEvents = () => {
     document.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     el("feedbackModal").classList.add("hidden");
     alert("Thanks for your feedback! We'll get back to you soon.");
+  });
+
+  el("orderSearch").addEventListener("input", () => renderOrders());
+  el("orderStatusFilter").addEventListener("change", () => renderOrders());
+
+  el("btnExportOrders").addEventListener("click", () => {
+    const rows = [["Order ID", "Name", "Client ID", "Client Email", "Quantity", "Amount", "Status", "Created"]];
+    state.orders.forEach((o) => {
+      rows.push([
+        o.id,
+        `"${o.name}"`,
+        o.clientId || "",
+        o.clientName || "",
+        o.totalCount,
+        getOrderAmount(o).toFixed(2),
+        o.status,
+        o.createdAt,
+      ]);
+    });
+    downloadCSV(rows, "ripay-orders.csv");
+  });
+
+  el("btnExportPayments").addEventListener("click", () => {
+    const rows = [["Payment ID", "Date", "Status", "Customer ID", "Order ID", "Amount"]];
+    state.payments.forEach((p) => {
+      rows.push([p.id, p.date, p.status, p.customerId, p.orderId, Number(p.amount || 0).toFixed(2)]);
+    });
+    downloadCSV(rows, "ripay-payments.csv");
   });
 };
 

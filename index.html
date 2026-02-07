@@ -101,7 +101,19 @@
                     <h2>Overview</h2>
                     <p>All orders waiting for payment or already paid.</p>
                   </div>
-                  <button id="btnBulkPay" class="btn primary">Pay selected orders</button>
+                  <div class="tab-head-actions">
+                    <button id="btnExportOrders" class="btn ghost">Export CSV</button>
+                    <button id="btnBulkPay" class="btn primary">Pay selected orders</button>
+                  </div>
+                </div>
+                <div id="statsRow" class="stats-row"></div>
+                <div class="order-filter">
+                  <input id="orderSearch" type="text" placeholder="Search orders by name, ID, or client..." />
+                  <select id="orderStatusFilter">
+                    <option value="all">All statuses</option>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="paid">Paid</option>
+                  </select>
                 </div>
                 <div class="order-table">
                   <div class="order-row order-header">
@@ -143,6 +155,7 @@
                     <h2>Payments</h2>
                     <p>Payment history from customers.</p>
                   </div>
+                  <button id="btnExportPayments" class="btn ghost">Export CSV</button>
                 </div>
                 <div class="payment-table">
                   <div class="payment-row payment-header">
@@ -170,8 +183,10 @@
           </div>
           <button id="btnCloseGallery" class="btn ghost">Close</button>
         </div>
+        <div id="orderDetail" class="order-detail"></div>
         <div id="galleryGrid" class="gallery-grid"></div>
         <div class="modal-actions">
+          <button id="btnDeleteOrder" class="btn ghost danger">Delete order</button>
           <button id="btnPaySingle" class="btn primary">Pay</button>
         </div>
       </div>
@@ -204,6 +219,7 @@
             <input id="payCvc" type="text" placeholder="123" />
           </label>
         </div>
+        <div id="payTotal" class="pay-total"></div>
         <div class="modal-actions">
           <button id="btnConfirmPay" class="btn primary">Confirm payment</button>
         </div>
