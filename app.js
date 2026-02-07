@@ -1,4 +1,4 @@
-const STORAGE_KEY = "ripay-data-v1";
+const STORAGE_KEY = "renpay-data-v1";
 
 const state = {
   user: null,
@@ -671,7 +671,7 @@ const setupEvents = () => {
         o.createdAt,
       ]);
     });
-    downloadCSV(rows, "ripay-orders.csv");
+    downloadCSV(rows, "renpay-orders.csv");
   });
 
   el("btnExportPayments").addEventListener("click", () => {
@@ -679,7 +679,7 @@ const setupEvents = () => {
     state.payments.forEach((p) => {
       rows.push([p.id, p.date, p.status, p.customerId, p.orderId, Number(p.amount || 0).toFixed(2)]);
     });
-    downloadCSV(rows, "ripay-payments.csv");
+    downloadCSV(rows, "renpay-payments.csv");
   });
 };
 

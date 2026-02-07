@@ -501,7 +501,7 @@ main {
 }
 
 .gallery-item::after {
-  content: "RIPAY PREVIEW";
+  content: "RENPAY PREVIEW";
   position: absolute;
   inset: 0;
   display: grid;
@@ -522,7 +522,7 @@ main {
 }
 
 .lightbox-content::after {
-  content: "RIPAY PREVIEW";
+  content: "RENPAY PREVIEW";
   position: absolute;
   inset: 0;
   display: grid;
