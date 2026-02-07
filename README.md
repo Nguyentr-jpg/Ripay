@@ -1,0 +1,10 @@
+renpay-api-token
+
+Token value
+F8RGVW_HyT4ZQiMl07iCr71Ylri4R2PU6fAM4in4
+
+Access Key ID
+44adad9bec6f5b720f0dce3541505011
+
+Secret Access Key
+230316b4c860e93792f53dffe7aea08bddb1777ee3ba44af937f3c058f44e4d4
