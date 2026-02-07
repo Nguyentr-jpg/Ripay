@@ -1,11 +1,11 @@
 {
   "framework": null,
-  "buildCommand": null,
+  "installCommand": "npm install",
+  "buildCommand": "npx prisma generate",
   "outputDirectory": ".",
-  "installCommand": null,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],
