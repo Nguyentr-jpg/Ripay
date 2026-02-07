@@ -1,7 +1,5 @@
 {
-  "projectSettings": {
-    "framework": null
-  },
+  "framework": null,
   "buildCommand": null,
   "outputDirectory": ".",
   "installCommand": null,
