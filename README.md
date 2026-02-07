@@ -1,3 +1,4 @@
+coudflare
 Account ID
 4e7405e503119b46244a52c4f6d7d563
 
@@ -9,3 +10,13 @@ Secret Access Key
 
 Public Development URL
 https://pub-3b04d233a2fd437d8ba2a65e800ad970.r2.dev
+
+
+
+
+supbase
+Project URL
+https://fbshrbmmzfpiyjattxop.supabase.co
+
+Publishable API Key
+sb_publishable_HywWwyFC-z88k4yCwsxcRg_5Kuth4da
