@@ -453,7 +453,7 @@ const markPaid = (orderIds) => {
   renderPayments();
 };
 
-const createOrder = () => {
+const createOrder = async () => {
   if (!state.subscribed) {
     el("subModal").classList.remove("hidden");
     return;
@@ -472,29 +472,91 @@ const createOrder = () => {
 
   const now = new Date();
   const createdAt = formatLocalDateTime(now);
-  const newOrders = [];
+  const validItems = items.filter((item) => item.type && item.count);
 
-  items.forEach((item) => {
-    if (!item.type) return;
-    if (!item.count) return;
-    const displayName = ensureDatePrefix(item.type, createdAt);
-    const amount = Number((item.count * (item.unitPrice || 0)).toFixed(2));
-    newOrders.push({
-      id: `ORD-${Math.floor(Math.random() * 9000 + 1000)}`,
-      name: displayName,
-      items: [item],
-      totalCount: item.count,
-      totalAmount: amount,
-      status: "unpaid",
-      createdAt,
-      clientId: `CLI-${Math.floor(Math.random() * 90000 + 10000)}`,
-      clientName: state.user || "client@email.com",
-    });
-  });
-
-  if (!newOrders.length) {
+  if (!validItems.length) {
     alert("Please enter at least one order name and quantity.");
     return;
+  }
+
+  // Disable button while saving
+  const btnCreate = el("btnCreate");
+  btnCreate.disabled = true;
+  btnCreate.textContent = "Saving...";
+
+  const newOrders = [];
+
+  for (const item of validItems) {
+    const displayName = ensureDatePrefix(item.type, createdAt);
+    const amount = Number((item.count * (item.unitPrice || 0)).toFixed(2));
+    const clientId = `CLI-${Math.floor(Math.random() * 90000 + 10000)}`;
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderName: displayName,
+          totalCount: item.count,
+          totalAmount: amount,
+          clientId,
+          clientName: state.user || "client@email.com",
+          userEmail: state.user || "client@email.com",
+          items: [item],
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.order) {
+        // Map API response back to local format
+        newOrders.push({
+          id: data.order.orderNumber,
+          name: data.order.orderName,
+          items: (data.order.items || []).map((i) => ({
+            type: i.type,
+            count: i.count,
+            link: i.link || "",
+            unitPrice: i.unitPrice,
+          })),
+          totalCount: data.order.totalCount,
+          totalAmount: data.order.totalAmount,
+          status: data.order.status.toLowerCase(),
+          createdAt,
+          clientId: data.order.clientId || clientId,
+          clientName: data.order.clientName || state.user,
+          dbId: data.order.id,
+        });
+      } else {
+        console.error("API error:", data.error);
+        // Fallback to local-only order
+        newOrders.push({
+          id: `ORD-${Math.floor(Math.random() * 9000 + 1000)}`,
+          name: displayName,
+          items: [item],
+          totalCount: item.count,
+          totalAmount: amount,
+          status: "unpaid",
+          createdAt,
+          clientId,
+          clientName: state.user || "client@email.com",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to save order to database:", err);
+      // Fallback to local-only order
+      newOrders.push({
+        id: `ORD-${Math.floor(Math.random() * 9000 + 1000)}`,
+        name: displayName,
+        items: [item],
+        totalCount: item.count,
+        totalAmount: amount,
+        status: "unpaid",
+        createdAt,
+        clientId,
+        clientName: state.user || "client@email.com",
+      });
+    }
   }
 
   state.orders = [...newOrders, ...state.orders];
@@ -503,6 +565,9 @@ const createOrder = () => {
 
   renderLineItems();
   switchTab("overview");
+
+  btnCreate.disabled = false;
+  btnCreate.textContent = "Apply";
 };
 
 const switchTab = (tab) => {
@@ -683,12 +748,49 @@ const setupEvents = () => {
   });
 };
 
+const fetchOrdersFromDB = async () => {
+  try {
+    const response = await fetch("/api/orders");
+    const data = await response.json();
+    if (data.success && Array.isArray(data.orders)) {
+      const dbOrders = data.orders.map((o) => ({
+        id: o.orderNumber,
+        name: o.orderName,
+        items: (o.items || []).map((i) => ({
+          type: i.type,
+          count: i.count,
+          link: i.link || "",
+          unitPrice: i.unitPrice,
+        })),
+        totalCount: o.totalCount,
+        totalAmount: o.totalAmount,
+        status: o.status.toLowerCase(),
+        createdAt: new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 16),
+        clientId: o.clientId || "",
+        clientName: o.clientName || "",
+        dbId: o.id,
+      }));
+
+      // Merge: DB orders take priority, keep local-only orders that aren't in DB
+      const dbIds = new Set(dbOrders.map((o) => o.id));
+      const localOnly = state.orders.filter((o) => !dbIds.has(o.id) && !o.dbId);
+      state.orders = [...dbOrders, ...localOnly];
+      saveState();
+      renderOrders();
+    }
+  } catch (err) {
+    console.error("Could not fetch orders from database:", err);
+  }
+};
+
 const init = () => {
   loadState();
   renderOrders();
   renderPayments();
   renderLineItems();
   setupEvents();
+  // Fetch latest orders from database in background
+  fetchOrdersFromDB();
 };
 
 init();

@@ -1,0 +1,73 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  orders    Order[]
+
+  @@map("users")
+}
+
+model Order {
+  id          String      @id @default(uuid()) @db.Uuid
+  orderNumber String      @unique @map("order_number")
+  orderName   String      @map("order_name")
+  totalCount  Int         @map("total_count")
+  totalAmount Float       @map("total_amount")
+  status      String      @default("UNPAID")
+  clientId    String?     @map("client_id")
+  clientName  String?     @map("client_name")
+  userId      String      @map("user_id") @db.Uuid
+  user        User        @relation(fields: [userId], references: [id])
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  items       OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      String
+  count     Int
+  link      String?
+  unitPrice Float    @map("unit_price")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("order_items")
+}
+
+model File {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  url       String
+  orderId   String?  @map("order_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("files")
+}
+
+model Payment {
+  id         String   @id @default(uuid()) @db.Uuid
+  date       String
+  status     String   @default("Paid")
+  customerId String   @map("customer_id")
+  orderId    String   @map("order_id")
+  amount     Float
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("payments")
+}
