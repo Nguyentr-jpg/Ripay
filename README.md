@@ -27,7 +27,7 @@ npx serve .
 
 1. Go to [vercel.com/new](https://vercel.com/new)
 2. Click **Import Git Repository**
-3. Select the **Nguyentr-jpg/Ripay** repository
+3. Select the **Nguyentr-jpg/Renpay** repository
 4. Configure the project:
    - **Project Name:** `renpay`
    - **Framework Preset:** `Other` (this is a static site)
