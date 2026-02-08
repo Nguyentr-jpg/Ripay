@@ -10,6 +10,9 @@
 .DS_Store
 Thumbs.db
 
+# MCP config (contains tokens)
+.mcp.json
+
 # Editor files
 .vscode/
 .idea/
