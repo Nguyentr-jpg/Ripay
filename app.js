@@ -1,7 +1,12 @@
 const STORAGE_KEY = "renpay-data-v1";
+const SUPABASE_URL = "https://fbshrbmmzfpiyjattxop.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZic2hyYm1temZwaXlqYXR0eG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg3NDgwNzIsImV4cCI6MjA1NDMyNDA3Mn0.zmJEFbNR1VLDVofIfPMQdVBVE6Kz2mN-JhsFGnGOrSw";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const state = {
   user: null,
+  session: null,
   subscribed: false,
   orders: [],
   payments: [],
@@ -22,6 +27,40 @@ const showToast = (message, type = "error", duration = 5000) => {
     toast.classList.add("fadeOut");
     setTimeout(() => toast.remove(), 300);
   }, duration);
+};
+
+const handleAuthUser = (session) => {
+  if (session?.user) {
+    const user = session.user;
+    state.user = user.email;
+    state.session = session;
+    const displayName = user.user_metadata?.full_name || user.email;
+    const avatar = user.user_metadata?.avatar_url;
+
+    el("sellerName").textContent = displayName;
+    el("sellerRole").textContent = user.email;
+    if (avatar) {
+      el("sellerAvatar").innerHTML = `<img src="${avatar}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover" />`;
+    } else {
+      el("sellerAvatar").textContent = displayName.charAt(0).toUpperCase();
+    }
+    el("userBadge").textContent = displayName;
+    el("userBadge").classList.remove("hidden");
+    el("loginScreen").classList.add("hidden");
+    el("appScreen").classList.remove("hidden");
+
+    loadState();
+    renderOrders();
+    renderPayments();
+    renderLineItems();
+    fetchOrdersFromDB();
+  } else {
+    state.user = null;
+    state.session = null;
+    el("loginScreen").classList.remove("hidden");
+    el("appScreen").classList.add("hidden");
+    el("userBadge").classList.add("hidden");
+  }
 };
 
 const seedData = () => ({
@@ -463,9 +502,11 @@ const markPaid = async (orderIds) => {
     // Sync status to database
     if (order.dbId) {
       try {
+        const putHeaders = { "Content-Type": "application/json" };
+        if (state.session?.access_token) putHeaders["Authorization"] = `Bearer ${state.session.access_token}`;
         await fetch("/api/orders", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: putHeaders,
           body: JSON.stringify({
             orderNumber: order.id,
             status: "PAID",
@@ -524,7 +565,7 @@ const createOrder = async () => {
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           orderName: displayName,
           totalCount: item.count,
@@ -613,24 +654,26 @@ const switchTab = (tab) => {
 };
 
 const setupEvents = () => {
-  el("btnLogin").addEventListener("click", () => {
-    const name = el("loginEmail").value.trim();
-    if (!name) {
-      alert("Please enter your email.");
-      return;
+  el("btnGoogleLogin").addEventListener("click", async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) {
+      showToast("Không thể đăng nhập. Vui lòng thử lại.", "error");
+      console.error("Login error:", error);
     }
-    state.user = name;
-    el("sellerName").textContent = name;
-    el("userBadge").textContent = name;
-    el("userBadge").classList.remove("hidden");
-    el("loginScreen").classList.add("hidden");
-    el("appScreen").classList.remove("hidden");
   });
 
-  el("btnLogout").addEventListener("click", () => {
+  el("btnLogout").addEventListener("click", async () => {
+    await supabase.auth.signOut();
     state.user = null;
+    state.session = null;
     el("loginScreen").classList.remove("hidden");
     el("appScreen").classList.add("hidden");
+    el("userBadge").classList.add("hidden");
   });
 
   document.querySelectorAll(".nav-item").forEach((btn) => {
@@ -669,9 +712,11 @@ const setupEvents = () => {
     // Delete from database if synced
     if (order.dbId) {
       try {
+        const delHeaders = { "Content-Type": "application/json" };
+        if (state.session?.access_token) delHeaders["Authorization"] = `Bearer ${state.session.access_token}`;
         await fetch("/api/orders", {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
+          headers: delHeaders,
           body: JSON.stringify({ orderNumber: order.id }),
         });
       } catch (err) {
@@ -795,11 +840,17 @@ const setupEvents = () => {
   });
 };
 
+const getAuthHeaders = () => {
+  const headers = { "Content-Type": "application/json" };
+  if (state.session?.access_token) headers["Authorization"] = `Bearer ${state.session.access_token}`;
+  return headers;
+};
+
 const syncLocalOrderToDB = async (order) => {
   try {
     const response = await fetch("/api/orders", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         orderName: order.name,
         totalCount: order.totalCount,
@@ -826,7 +877,7 @@ const syncLocalOrderToDB = async (order) => {
 
 const fetchOrdersFromDB = async () => {
   try {
-    const response = await fetch("/api/orders");
+    const response = await fetch("/api/orders", { headers: getAuthHeaders() });
     const data = await response.json();
     if (data.success && Array.isArray(data.orders)) {
       const dbOrders = data.orders.map((o) => ({
@@ -858,7 +909,7 @@ const fetchOrdersFromDB = async () => {
 
       // After syncing, re-fetch to get the complete list
       if (localOnly.length > 0) {
-        const refreshResponse = await fetch("/api/orders");
+        const refreshResponse = await fetch("/api/orders", { headers: getAuthHeaders() });
         const refreshData = await refreshResponse.json();
         if (refreshData.success && Array.isArray(refreshData.orders)) {
           const allDbOrders = refreshData.orders.map((o) => ({
@@ -892,14 +943,17 @@ const fetchOrdersFromDB = async () => {
   }
 };
 
-const init = () => {
-  loadState();
-  renderOrders();
-  renderPayments();
-  renderLineItems();
+const init = async () => {
   setupEvents();
-  // Fetch latest orders from database in background
-  fetchOrdersFromDB();
+
+  // Listen for auth state changes (login, logout, token refresh)
+  supabase.auth.onAuthStateChange((_event, session) => {
+    handleAuthUser(session);
+  });
+
+  // Check if already logged in
+  const { data: { session } } = await supabase.auth.getSession();
+  handleAuthUser(session);
 };
 
 init();
