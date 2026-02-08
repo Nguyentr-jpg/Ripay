@@ -119,7 +119,7 @@ async function handlePost(req, res) {
       orderNumber,
       orderName,
       totalCount: Number(totalCount),
-      totalAmount: Number(totalAmount),
+      totalAmount: String(Number(totalAmount).toFixed(2)),
       status: "UNPAID",
       clientId: clientId || `CLI-${Math.floor(Math.random() * 90000 + 10000)}`,
       clientName: clientName || userEmail,
@@ -129,8 +129,8 @@ async function handlePost(req, res) {
             create: items.map((item) => ({
               type: item.type || "",
               count: Number(item.count || 0),
-              unitPrice: Number(item.unitPrice || 0),
-              subtotal: Number((item.count || 0) * (item.unitPrice || 0)),
+              unitPrice: String(Number(item.unitPrice || 0).toFixed(2)),
+              subtotal: String((Number(item.count || 0) * Number(item.unitPrice || 0)).toFixed(2)),
             })),
           }
         : undefined,
