@@ -70,7 +70,15 @@ module.exports = async function handler(req, res) {
 };
 
 async function handleGet(req, res) {
+  const userEmail = req.query.userEmail;
+
+  const where = {};
+  if (userEmail) {
+    where.user = { email: userEmail };
+  }
+
   const orders = await getPrisma().order.findMany({
+    where,
     include: { items: true },
     orderBy: { createdAt: "desc" },
   });

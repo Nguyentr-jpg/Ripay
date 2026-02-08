@@ -422,10 +422,10 @@ const closePayModal = () => {
 };
 
 const getOrderAmount = (order) => {
-  if (typeof order.totalAmount === "number") return order.totalAmount;
+  if (order.totalAmount != null && order.totalAmount !== "") return Number(order.totalAmount);
   if (Array.isArray(order.items)) {
     return order.items.reduce(
-      (sum, item) => sum + (item.count || 0) * (item.unitPrice || 0),
+      (sum, item) => sum + (Number(item.count) || 0) * (Number(item.unitPrice) || 0),
       0
     );
   }
@@ -535,12 +535,12 @@ const createOrder = async () => {
           name: data.order.orderName,
           items: (data.order.items || []).map((i) => ({
             type: i.type,
-            count: i.count,
+            count: Number(i.count),
             link: i.link || "",
-            unitPrice: i.unitPrice,
+            unitPrice: Number(i.unitPrice),
           })),
-          totalCount: data.order.totalCount,
-          totalAmount: data.order.totalAmount,
+          totalCount: Number(data.order.totalCount),
+          totalAmount: Number(data.order.totalAmount),
           status: data.order.status.toLowerCase(),
           createdAt,
           clientId: data.order.clientId || clientId,
@@ -843,7 +843,9 @@ const syncLocalOrderToDB = async (order) => {
 
 const fetchOrdersFromDB = async () => {
   try {
-    const response = await fetch("/api/orders");
+    const email = state.user && state.user.email;
+    const url = email ? `/api/orders?userEmail=${encodeURIComponent(email)}` : "/api/orders";
+    const response = await fetch(url);
     const data = await response.json();
     if (data.success && Array.isArray(data.orders)) {
       const dbOrders = data.orders.map((o) => ({
@@ -851,12 +853,12 @@ const fetchOrdersFromDB = async () => {
         name: o.orderName,
         items: (o.items || []).map((i) => ({
           type: i.type,
-          count: i.count,
+          count: Number(i.count),
           link: i.link || "",
-          unitPrice: i.unitPrice,
+          unitPrice: Number(i.unitPrice),
         })),
-        totalCount: o.totalCount,
-        totalAmount: o.totalAmount,
+        totalCount: Number(o.totalCount),
+        totalAmount: Number(o.totalAmount),
         status: o.status.toLowerCase(),
         createdAt: new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 16),
         clientId: o.clientId || "",
@@ -875,7 +877,7 @@ const fetchOrdersFromDB = async () => {
 
       // After syncing, re-fetch to get the complete list
       if (localOnly.length > 0) {
-        const refreshResponse = await fetch("/api/orders");
+        const refreshResponse = await fetch(url);
         const refreshData = await refreshResponse.json();
         if (refreshData.success && Array.isArray(refreshData.orders)) {
           const allDbOrders = refreshData.orders.map((o) => ({
@@ -883,12 +885,12 @@ const fetchOrdersFromDB = async () => {
             name: o.orderName,
             items: (o.items || []).map((i) => ({
               type: i.type,
-              count: i.count,
+              count: Number(i.count),
               link: i.link || "",
-              unitPrice: i.unitPrice,
+              unitPrice: Number(i.unitPrice),
             })),
-            totalCount: o.totalCount,
-            totalAmount: o.totalAmount,
+            totalCount: Number(o.totalCount),
+            totalAmount: Number(o.totalAmount),
             status: o.status.toLowerCase(),
             createdAt: new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 16),
             clientId: o.clientId || "",
