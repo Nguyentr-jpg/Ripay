@@ -8,12 +8,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  CLIENT
+  EDITOR
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum OrderStatus {
+  UNPAID
+  PAID
+  PROCESSING
+  COMPLETED
+  CANCELLED
+
+  @@map("order_status")
+}
+
+enum PaymentGateway {
+  STRIPE
+  VNPAY
+  PAYOS
+
+  @@map("payment_gateway")
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+
+  @@map("payment_status")
+}
+
 model User {
   id              String    @id @default(uuid()) @db.Uuid
   email           String    @unique @db.VarChar(255)
   name            String?   @db.VarChar(255)
   passwordHash    String?   @map("password_hash") @db.VarChar(255)
-  role            String    @default("CLIENT")
+  role            UserRole  @default(CLIENT)
   emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -29,7 +64,7 @@ model Order {
   orderName   String      @map("order_name") @db.VarChar(500)
   totalCount  Int         @map("total_count")
   totalAmount Decimal     @map("total_amount") @db.Decimal(10, 2)
-  status      String      @default("UNPAID")
+  status      OrderStatus @default(UNPAID)
   clientId    String?     @map("client_id") @db.VarChar(100)
   clientName  String?     @map("client_name") @db.VarChar(255)
   userId      String      @map("user_id") @db.Uuid
@@ -75,20 +110,20 @@ model File {
 }
 
 model Payment {
-  id              String    @id @default(uuid()) @db.Uuid
-  paymentNumber   String    @unique @map("payment_number") @db.VarChar(50)
-  orderId         String    @map("order_id") @db.Uuid
-  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  userId          String    @map("user_id") @db.Uuid
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gateway         String    @default("STRIPE")
-  transactionId   String?   @map("transaction_id") @db.VarChar(255)
-  amount          Decimal   @db.Decimal(10, 2)
-  currency        String    @default("USD") @db.VarChar(10)
-  status          String    @default("PENDING")
-  gatewayResponse Json?     @map("gateway_response")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  completedAt     DateTime? @map("completed_at") @db.Timestamptz
+  id              String         @id @default(uuid()) @db.Uuid
+  paymentNumber   String         @unique @map("payment_number") @db.VarChar(50)
+  orderId         String         @map("order_id") @db.Uuid
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId          String         @map("user_id") @db.Uuid
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gateway         PaymentGateway @default(STRIPE)
+  transactionId   String?        @map("transaction_id") @db.VarChar(255)
+  amount          Decimal        @db.Decimal(10, 2)
+  currency        String         @default("USD") @db.VarChar(10)
+  status          PaymentStatus  @default(PENDING)
+  gatewayResponse Json?          @map("gateway_response")
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  completedAt     DateTime?      @map("completed_at") @db.Timestamptz
 
   @@map("payments")
 }
