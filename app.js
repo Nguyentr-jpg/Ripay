@@ -402,7 +402,7 @@ const closeGallery = () => {
 };
 
 const openLightbox = (src) => {
-  if (src && (isImageUrl(src) || isPreviewHost(src))) {
+  if (src && (src.startsWith('data:image/') || isImageUrl(src) || isPreviewHost(src))) {
     el("lightboxImg").src = src;
     el("lightbox").classList.remove("hidden");
     return;
