@@ -83,8 +83,9 @@ model OrderItem {
   id        String   @id @default(uuid()) @db.Uuid
   orderId   String   @map("order_id") @db.Uuid
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  type      String   @map("item_type") @db.VarChar(50)
+  type      String   @map("item_type") @db.VarChar(500)
   count     Int      @map("quantity")
+  link      String?  @map("source_link") @db.VarChar(2000)
   unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
   subtotal  Decimal  @default(0) @db.Decimal(10, 2)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz

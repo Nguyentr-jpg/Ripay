@@ -129,6 +129,7 @@ async function handlePost(req, res) {
             create: items.map((item) => ({
               type: item.type || "",
               count: Number(item.count || 0),
+              link: item.link || null,
               unitPrice: String(Number(item.unitPrice || 0).toFixed(2)),
               subtotal: String((Number(item.count || 0) * Number(item.unitPrice || 0)).toFixed(2)),
             })),
