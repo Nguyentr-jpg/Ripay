@@ -335,7 +335,40 @@ const renderOrderDetail = (order) => {
   `;
 };
 
-const openGallery = (orderId) => {
+const renderGalleryItems = (order, mediaFiles) => {
+  const grid = el("galleryGrid");
+  grid.innerHTML = "";
+
+  mediaFiles.forEach((file) => {
+    const item = document.createElement("div");
+    item.className = "gallery-item";
+
+    if (file.thumbnailUrl) {
+      item.style.backgroundImage = `url('${file.thumbnailUrl}')`;
+      item.dataset.src = file.thumbnailUrl;
+      item.dataset.fileName = file.name;
+    }
+
+    if (order.status === 'unpaid') {
+      item.classList.add('watermarked');
+    }
+
+    item.addEventListener("click", () => openLightbox(item.dataset.src));
+    grid.appendChild(item);
+  });
+};
+
+const getOrderLink = (order) => {
+  if (!order.items) return null;
+  for (const item of order.items) {
+    if (item.link && (item.link.includes('dropbox.com') || item.link.includes('drive.google.com'))) {
+      return item.link;
+    }
+  }
+  return null;
+};
+
+const openGallery = async (orderId) => {
   const order = state.orders.find((o) => o.id === orderId);
   if (!order) return;
 
@@ -346,50 +379,25 @@ const openGallery = (orderId) => {
   const grid = el("galleryGrid");
   grid.innerHTML = "";
 
-  // Use mediaFiles if available (from Dropbox/Drive), otherwise fallback to links
-  const mediaFiles = order.mediaFiles || [];
+  let mediaFiles = order.mediaFiles || [];
 
   if (mediaFiles.length > 0) {
-    // Display fetched media files
-    mediaFiles.forEach((file) => {
-      const item = document.createElement("div");
-      item.className = "gallery-item";
-
-      if (file.thumbnailUrl) {
-        item.style.backgroundImage = `url('${file.thumbnailUrl}')`;
-        item.dataset.src = file.thumbnailUrl;
-        item.dataset.fileName = file.name;
-      }
-
-      // Add paid/unpaid overlay
-      if (order.status === 'unpaid') {
-        item.classList.add('watermarked');
-      }
-
-      item.addEventListener("click", () => openLightbox(item.dataset.src));
-      grid.appendChild(item);
-    });
+    renderGalleryItems(order, mediaFiles);
   } else {
-    // Fallback to old link parsing method
-    const links = order.items
-      ? order.items.flatMap((item) => parseLinks(item.link).map(normalizeImageUrl))
-      : [];
-    const previewCount = links.length
-      ? links.length
-      : Math.min(order.totalCount, 16);
-
-    for (let i = 0; i < previewCount; i += 1) {
-      const item = document.createElement("div");
-      item.className = "gallery-item";
-      if (links[i] && (isImageUrl(links[i]) || isPreviewHost(links[i]))) {
-        item.style.backgroundImage = `url('${links[i]}')`;
-        item.dataset.src = links[i];
-      } else if (links[i]) {
-        item.dataset.src = "";
-        item.classList.add("link-only");
+    // Try to re-fetch from Dropbox/Drive if order has a link
+    const link = getOrderLink(order);
+    if (link) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#888;">Loading media from cloud...</div>';
+      const fetched = await fetchMediaFromLink(link);
+      if (fetched && fetched.length > 0) {
+        order.mediaFiles = fetched;
+        saveState();
+        renderGalleryItems(order, fetched);
+      } else {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#888;">No media files found.</div>';
       }
-      item.addEventListener("click", () => openLightbox(item.dataset.src));
-      grid.appendChild(item);
+    } else {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#888;">No media files available.</div>';
     }
   }
 
@@ -402,7 +410,7 @@ const closeGallery = () => {
 };
 
 const openLightbox = (src) => {
-  if (src && (isImageUrl(src) || isPreviewHost(src))) {
+  if (src && (src.startsWith('data:image/') || isImageUrl(src) || isPreviewHost(src))) {
     el("lightboxImg").src = src;
     el("lightbox").classList.remove("hidden");
     return;
