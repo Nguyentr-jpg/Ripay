@@ -192,6 +192,7 @@ async function fetchFromDropbox(sharedLink, accessToken) {
       const batchResults = await Promise.all(
         batch.map(async (file) => {
           try {
+            // Use file ID directly (works since token owner has access)
             const thumbResponse = await fetch(
               'https://content.dropboxapi.com/2/files/get_thumbnail_v2',
               {
@@ -200,9 +201,8 @@ async function fetchFromDropbox(sharedLink, accessToken) {
                   'Authorization': `Bearer ${accessToken}`,
                   'Dropbox-API-Arg': JSON.stringify({
                     resource: {
-                      '.tag': 'link',
-                      url: finalUrl,
-                      path: file.path_display
+                      '.tag': 'path',
+                      path: file.id
                     },
                     format: 'jpeg',
                     size: 'w256h256'
