@@ -540,9 +540,68 @@ main {
   content: "DIRECT IMAGE REQUIRED";
 }
 
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 40px;
+  cursor: pointer;
+  z-index: 32;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+.lightbox-close:hover { background: rgba(255,255,255,0.15); }
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: #fff;
+  font-size: 48px;
+  cursor: pointer;
+  z-index: 32;
+  width: 56px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+.lightbox-nav:hover { background: rgba(255,255,255,0.25); }
+.lightbox-prev { left: 12px; }
+.lightbox-next { right: 12px; }
+
 .lightbox-content {
   position: relative;
+  width: calc(100vw - 160px);
+  height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: zoom-in;
 }
+.lightbox-content.zoomed { cursor: grab; }
+.lightbox-content.zoomed:active { cursor: grabbing; }
 
 .lightbox-content::after {
   content: "RENPAY PREVIEW";
@@ -550,43 +609,42 @@ main {
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 32px;
-  letter-spacing: 6px;
-  color: rgba(255, 255, 255, 0.25);
+  font-size: 42px;
+  letter-spacing: 8px;
+  color: rgba(255, 255, 255, 0.15);
   text-transform: uppercase;
   transform: rotate(-20deg);
   pointer-events: none;
-}
-
-.lightbox {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 8, 6, 0.9);
-  display: grid;
-  place-items: center;
-  z-index: 30;
-  padding: 20px;
-}
-
-.lightbox .btn {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-}
-
-.lightbox-content {
-  width: 95vw;
-  height: 90vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  z-index: 1;
 }
 
 .lightbox-content img {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
-  border-radius: 12px;
+  transition: transform 0.3s ease;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.lightbox-content.zoomed img {
+  max-width: none;
+  max-height: none;
+  width: 200%;
+  cursor: grab;
+}
+
+.lightbox-footer {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 80px;
+  color: rgba(255,255,255,0.7);
+  font-size: 14px;
+  z-index: 32;
+  pointer-events: none;
 }
 
 .plan-grid {

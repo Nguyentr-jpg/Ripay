@@ -339,7 +339,7 @@ const renderGalleryItems = (order, mediaFiles) => {
   const grid = el("galleryGrid");
   grid.innerHTML = "";
 
-  mediaFiles.forEach((file) => {
+  mediaFiles.forEach((file, idx) => {
     const item = document.createElement("div");
     item.className = "gallery-item";
 
@@ -353,7 +353,7 @@ const renderGalleryItems = (order, mediaFiles) => {
       item.classList.add('watermarked');
     }
 
-    item.addEventListener("click", () => openLightbox(item.dataset.src));
+    item.addEventListener("click", () => openLightbox(item.dataset.src, idx));
     grid.appendChild(item);
   });
 };
@@ -410,19 +410,67 @@ const closeGallery = () => {
   state.activeOrderId = null;
 };
 
-const openLightbox = (src) => {
-  if (src && (src.startsWith('data:image/') || isImageUrl(src) || isPreviewHost(src))) {
-    el("lightboxImg").src = src;
-    el("lightbox").classList.remove("hidden");
+// Lightbox state
+let lightboxImages = [];
+let lightboxIndex = 0;
+
+const openLightbox = (src, index) => {
+  if (!src || (!src.startsWith('data:image/') && !isImageUrl(src) && !isPreviewHost(src))) {
+    alert("Link này không hiển thị được.");
     return;
   }
 
-  alert("Link này không hiển thị được. Hãy dùng link ảnh trực tiếp hoặc link file Dropbox/Google Drive.");
+  // Build image list from current gallery
+  const items = document.querySelectorAll(".gallery-item[data-src]");
+  lightboxImages = Array.from(items).map((item) => ({
+    src: item.dataset.src,
+    name: item.dataset.fileName || "",
+  }));
+  lightboxIndex = typeof index === "number" ? index : lightboxImages.findIndex((img) => img.src === src);
+  if (lightboxIndex < 0) lightboxIndex = 0;
+
+  showLightboxImage();
+  el("lightbox").classList.remove("hidden");
+  el("lightboxContent").classList.remove("zoomed");
+};
+
+const showLightboxImage = () => {
+  if (!lightboxImages.length) return;
+  const img = lightboxImages[lightboxIndex];
+  el("lightboxImg").src = img.src;
+  el("lightboxFileName").textContent = img.name;
+  el("lightboxCounter").textContent = `${lightboxIndex + 1} / ${lightboxImages.length}`;
+  el("lightboxContent").classList.remove("zoomed");
+};
+
+const lightboxPrev = () => {
+  if (!lightboxImages.length) return;
+  lightboxIndex = (lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length;
+  showLightboxImage();
+};
+
+const lightboxNext = () => {
+  if (!lightboxImages.length) return;
+  lightboxIndex = (lightboxIndex + 1) % lightboxImages.length;
+  showLightboxImage();
+};
+
+const toggleLightboxZoom = (e) => {
+  const content = el("lightboxContent");
+  const img = el("lightboxImg");
+  content.classList.toggle("zoomed");
+  if (content.classList.contains("zoomed") && e) {
+    const rect = content.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    img.style.transformOrigin = `${x}% ${y}%`;
+  }
 };
 
 const closeLightbox = () => {
   el("lightbox").classList.add("hidden");
   el("lightboxImg").src = "";
+  lightboxImages = [];
 };
 
 const openPayModal = (orderIds) => {
@@ -828,8 +876,21 @@ const setupEvents = () => {
   });
 
   el("btnCloseLightbox").addEventListener("click", closeLightbox);
+  el("btnLightboxPrev").addEventListener("click", lightboxPrev);
+  el("btnLightboxNext").addEventListener("click", lightboxNext);
+  el("lightboxContent").addEventListener("click", (e) => {
+    if (e.target.id === "lightboxImg") toggleLightboxZoom(e);
+  });
   el("lightbox").addEventListener("click", (event) => {
     if (event.target.id === "lightbox") closeLightbox();
+  });
+
+  // Keyboard navigation for lightbox
+  document.addEventListener("keydown", (e) => {
+    if (el("lightbox").classList.contains("hidden")) return;
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowLeft") lightboxPrev();
+    if (e.key === "ArrowRight") lightboxNext();
   });
 
   el("btnOpenFeedback").addEventListener("click", () => {

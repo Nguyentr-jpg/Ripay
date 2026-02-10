@@ -226,9 +226,15 @@
     </div>
 
     <div id="lightbox" class="lightbox hidden">
-      <button id="btnCloseLightbox" class="btn ghost">Close</button>
-      <div class="lightbox-content">
+      <button id="btnCloseLightbox" class="lightbox-close">&times;</button>
+      <button id="btnLightboxPrev" class="lightbox-nav lightbox-prev">&lsaquo;</button>
+      <button id="btnLightboxNext" class="lightbox-nav lightbox-next">&rsaquo;</button>
+      <div id="lightboxContent" class="lightbox-content">
         <img id="lightboxImg" alt="Preview full" />
+      </div>
+      <div class="lightbox-footer">
+        <span id="lightboxFileName"></span>
+        <span id="lightboxCounter"></span>
       </div>
     </div>
 
