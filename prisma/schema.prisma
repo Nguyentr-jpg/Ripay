@@ -54,6 +54,7 @@ model User {
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   orders          Order[]
   payments        Payment[]
+  subscriptions   Subscription[]
 
   @@map("users")
 }
@@ -108,6 +109,19 @@ model File {
   expiresAt     DateTime? @map("expires_at") @db.Timestamptz
 
   @@map("files")
+}
+
+model Subscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      String   @db.VarChar(50)
+  status    String   @default("active") @db.VarChar(50)
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("subscriptions")
 }
 
 model Payment {

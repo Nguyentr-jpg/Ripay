@@ -74,6 +74,16 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // Check active subscription
+    const subscription = await db.subscription.findFirst({
+      where: {
+        userId: user.id,
+        status: "active",
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { expiresAt: "desc" },
+    });
+
     return res.status(200).json({
       success: true,
       user: {
@@ -84,6 +94,11 @@ module.exports = async function handler(req, res) {
         emailVerifiedAt: user.emailVerifiedAt,
         createdAt: user.createdAt,
       },
+      subscription: subscription ? {
+        plan: subscription.plan,
+        status: subscription.status,
+        expiresAt: subscription.expiresAt,
+      } : null,
     });
   } catch (error) {
     console.error("Auth API Error:", error);

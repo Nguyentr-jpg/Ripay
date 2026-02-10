@@ -712,6 +712,7 @@ const setupEvents = () => {
         localStorage.removeItem(STORAGE_KEY);
 
         state.user = data.user;
+        state.subscribed = Boolean(data.subscription);
         sessionStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
         showApp(data.user);
 
@@ -849,11 +850,42 @@ const setupEvents = () => {
     el("subModal").classList.add("hidden");
   });
 
-  el("btnStartSub").addEventListener("click", () => {
-    state.subscribed = true;
-    saveState();
-    el("subModal").classList.add("hidden");
-    alert("Subscription activated. You can now create orders.");
+  el("btnStartSub").addEventListener("click", async () => {
+    if (!state.user || !state.user.email) {
+      alert("Please sign in first.");
+      return;
+    }
+
+    const selectedPlan = document.querySelector(".plan-card.active");
+    const plan = selectedPlan && selectedPlan.dataset.plan ? selectedPlan.dataset.plan : "monthly";
+
+    const btn = el("btnStartSub");
+    btn.disabled = true;
+    btn.textContent = "Activating...";
+
+    try {
+      const response = await fetch("/api/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: state.user.email, plan }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        state.subscribed = true;
+        saveState();
+        el("subModal").classList.add("hidden");
+        alert("Subscription activated! You can now create orders.");
+      } else {
+        alert(data.error || "Failed to activate subscription.");
+      }
+    } catch (err) {
+      console.error("Subscription error:", err);
+      alert("Network error. Please try again.");
+    }
+
+    btn.disabled = false;
+    btn.textContent = "Start subscription";
   });
 
   document.querySelectorAll(".chip").forEach((chip) => {
@@ -1031,7 +1063,22 @@ const showApp = (user) => {
   el("appScreen").classList.remove("hidden");
 };
 
-const restoreSession = () => {
+const checkSubscription = async (email) => {
+  try {
+    const response = await fetch(`/api/subscription?email=${encodeURIComponent(email)}`);
+    const data = await response.json();
+    if (data.success && data.subscription) {
+      state.subscribed = true;
+      return true;
+    }
+  } catch (err) {
+    console.error("Failed to check subscription:", err);
+  }
+  state.subscribed = false;
+  return false;
+};
+
+const restoreSession = async () => {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return false;
@@ -1044,6 +1091,7 @@ const restoreSession = () => {
 
       state.user = user;
       showApp(user);
+      await checkSubscription(user.email);
       return true;
     }
   } catch (err) {
@@ -1053,7 +1101,7 @@ const restoreSession = () => {
   return false;
 };
 
-const init = () => {
+const init = async () => {
   // Don't load localStorage on init - we'll fetch from database instead
   // This prevents showing the wrong user's data
   renderOrders();
@@ -1061,7 +1109,7 @@ const init = () => {
   renderLineItems();
   setupEvents();
   // Restore session if user was previously logged in
-  restoreSession();
+  await restoreSession();
   // Fetch latest orders from database in background
   fetchOrdersFromDB();
 };
