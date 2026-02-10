@@ -379,6 +379,9 @@ const openGallery = async (orderId) => {
   const grid = el("galleryGrid");
   grid.innerHTML = "";
 
+  // Show modal immediately with spinner
+  el("galleryModal").classList.remove("hidden");
+
   let mediaFiles = order.mediaFiles || [];
 
   if (mediaFiles.length > 0) {
@@ -387,7 +390,7 @@ const openGallery = async (orderId) => {
     // Try to re-fetch from Dropbox/Drive if order has a link
     const link = getOrderLink(order);
     if (link) {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#888;">Loading media from cloud...</div>';
+      grid.innerHTML = '<div class="gallery-loading"><div class="spinner"></div><div>Loading media from cloud...</div></div>';
       const fetched = await fetchMediaFromLink(link);
       if (fetched && fetched.length > 0) {
         order.mediaFiles = fetched;
@@ -400,8 +403,6 @@ const openGallery = async (orderId) => {
       grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#888;">No media files available.</div>';
     }
   }
-
-  el("galleryModal").classList.remove("hidden");
 };
 
 const closeGallery = () => {
