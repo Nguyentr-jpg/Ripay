@@ -15,6 +15,23 @@ function getPrisma() {
   return prisma;
 }
 
+function getErrorHint(error) {
+  if (!error) return "Unknown authentication error.";
+  if (error.code === "P2021") {
+    return "Subscriptions table is missing. Run 'npx prisma db push' against production database.";
+  }
+  if (error.code === "P2022") {
+    return "Subscription columns are missing. Run 'npx prisma db push' then redeploy.";
+  }
+  if (error.code === "P1001") {
+    return "Cannot reach database. Check DATABASE_URL in Vercel.";
+  }
+  if (error.code === "P1000") {
+    return "Database authentication failed. Check DATABASE_URL credentials.";
+  }
+  return "Database query failed. Check database schema and environment variables.";
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -74,15 +91,26 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Check active subscription
-    const subscription = await db.subscription.findFirst({
-      where: {
-        userId: user.id,
-        status: "active",
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { expiresAt: "desc" },
-    });
+    // Check active subscription. Do not block login if subscription schema is not migrated yet.
+    let subscription = null;
+    let warning = null;
+    try {
+      subscription = await db.subscription.findFirst({
+        where: {
+          userId: user.id,
+          status: "active",
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { expiresAt: "desc" },
+      });
+    } catch (subscriptionError) {
+      if (subscriptionError.code === "P2021" || subscriptionError.code === "P2022") {
+        console.warn("Auth subscription lookup skipped due to schema mismatch:", subscriptionError.code);
+        warning = getErrorHint(subscriptionError);
+      } else {
+        throw subscriptionError;
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -99,12 +127,14 @@ module.exports = async function handler(req, res) {
         status: subscription.status,
         expiresAt: subscription.expiresAt,
       } : null,
+      warning,
     });
   } catch (error) {
     console.error("Auth API Error:", error);
     return res.status(500).json({
       error: "Authentication failed",
-      hint: "Database connection error. Check your environment variables.",
+      hint: getErrorHint(error),
+      code: error.code || null,
     });
   }
 };
