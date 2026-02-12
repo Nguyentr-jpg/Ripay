@@ -517,6 +517,30 @@ const resetLightboxZoom = () => {
   el("lightboxContent").classList.remove("zoomed");
 };
 
+const applyLightboxDefaultScale = () => {
+  const lightboxContent = el("lightboxContent");
+  const lightboxImg = el("lightboxImg");
+  if (!lightboxContent || !lightboxImg) return;
+
+  const naturalWidth = lightboxImg.naturalWidth || 0;
+  const naturalHeight = lightboxImg.naturalHeight || 0;
+  if (!naturalWidth || !naturalHeight) return;
+
+  const maxWidth = lightboxContent.clientWidth || window.innerWidth;
+  const maxHeight = lightboxContent.clientHeight || window.innerHeight;
+
+  if (naturalWidth >= naturalHeight) {
+    const targetWidth = Math.min(naturalWidth * 2, maxWidth);
+    lightboxImg.style.width = `${targetWidth}px`;
+    lightboxImg.style.height = "auto";
+    return;
+  }
+
+  const targetHeight = Math.min(naturalHeight * 2, maxHeight);
+  lightboxImg.style.height = `${targetHeight}px`;
+  lightboxImg.style.width = "auto";
+};
+
 const setLightboxIndex = (index) => {
   const items = state.lightbox.items;
   if (!items.length) return;
@@ -526,6 +550,11 @@ const setLightboxIndex = (index) => {
 
   const current = items[nextIndex];
   const lightboxImg = el("lightboxImg");
+  lightboxImg.style.width = "";
+  lightboxImg.style.height = "";
+  lightboxImg.onload = () => {
+    applyLightboxDefaultScale();
+  };
   lightboxImg.onerror = () => {
     if (current.fallbackSrc && lightboxImg.src !== current.fallbackSrc) {
       lightboxImg.src = current.fallbackSrc;
@@ -556,6 +585,8 @@ const closeLightbox = () => {
   el("lightbox").classList.add("hidden");
   el("lightbox").setAttribute("aria-hidden", "true");
   el("lightboxImg").src = "";
+  el("lightboxImg").style.width = "";
+  el("lightboxImg").style.height = "";
   resetLightboxZoom();
 };
 
