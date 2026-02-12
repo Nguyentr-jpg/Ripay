@@ -24,9 +24,15 @@ function getPayPalBaseUrl() {
     : "https://api-m.sandbox.paypal.com";
 }
 
+function normalizePlanId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.startsWith("P-") ? raw : `P-${raw}`;
+}
+
 function getPayPalPlanId(plan) {
-  if (plan === "monthly") return process.env.PAYPAL_PLAN_ID_MONTHLY || "";
-  if (plan === "annual") return process.env.PAYPAL_PLAN_ID_ANNUAL || "";
+  if (plan === "monthly") return normalizePlanId(process.env.PAYPAL_PLAN_ID_MONTHLY);
+  if (plan === "annual") return normalizePlanId(process.env.PAYPAL_PLAN_ID_ANNUAL);
   return "";
 }
 

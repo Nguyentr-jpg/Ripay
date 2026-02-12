@@ -19,10 +19,16 @@ function getPayPalClientId() {
   return process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || process.env.PAYPAL_CLIENT_ID || "";
 }
 
+function normalizePlanId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.startsWith("P-") ? raw : `P-${raw}`;
+}
+
 function getPayPalPlanIds() {
   return {
-    monthly: process.env.PAYPAL_PLAN_ID_MONTHLY || "",
-    annual: process.env.PAYPAL_PLAN_ID_ANNUAL || "",
+    monthly: normalizePlanId(process.env.PAYPAL_PLAN_ID_MONTHLY),
+    annual: normalizePlanId(process.env.PAYPAL_PLAN_ID_ANNUAL),
   };
 }
 
