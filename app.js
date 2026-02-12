@@ -7,6 +7,8 @@ const state = {
   subscribed: false,
   orders: [],
   payments: [],
+  leafBalance: 0,
+  leafCurrency: "USD",
   selectedOrders: new Set(),
   activeOrderId: null,
   payQueue: [],
@@ -59,15 +61,15 @@ const seedData = () => ({
   ],
   payments: [
     {
-      id: "PAY-5001",
+      id: "LEDGER-5001",
       date: "2026-02-04",
-      status: "Paid",
-      customerId: "CUS-84921",
-      orderName: "20260204 - Villa 78 - Photos",
-      orderId: "ORD-1002",
-      amount: 8,
+      type: "TOPUP",
+      description: "Leaf top-up (+20.00 Leaf)",
+      amount: 20,
+      balanceAfter: 20,
     },
   ],
+  leafBalance: 20,
 });
 
 const loadState = () => {
@@ -77,6 +79,7 @@ const loadState = () => {
     state.orders = data.orders;
     state.payments = data.payments;
     state.subscribed = false;
+    state.leafBalance = Number(data.leafBalance || 0);
     return;
   }
   try {
@@ -84,6 +87,7 @@ const loadState = () => {
     state.orders = data.orders || [];
     state.payments = data.payments || [];
     state.subscribed = Boolean(data.subscribed);
+    state.leafBalance = Number(data.leafBalance || 0);
   } catch (err) {
     console.error(err);
   }
@@ -108,6 +112,7 @@ const saveState = () => {
     orders: compactOrders,
     payments: state.payments,
     subscribed: state.subscribed,
+    leafBalance: state.leafBalance,
   };
 
   try {
@@ -135,6 +140,14 @@ const formatStatus = (status) => {
   }</span>`;
 };
 
+const formatMoney = (amount) => `$${Number(amount || 0).toFixed(2)}`;
+const formatLedgerDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  return date.toISOString().slice(0, 10);
+};
+
 const renderStats = () => {
   const row = el("statsRow");
   const total = state.orders.length;
@@ -159,6 +172,10 @@ const renderStats = () => {
     <div class="stat-card">
       <div class="stat-label">Pending amount</div>
       <div class="stat-value">$${pending.toFixed(2)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Leaf balance</div>
+      <div class="stat-value">${formatMoney(state.leafBalance)}</div>
     </div>
   `;
 };
@@ -221,22 +238,24 @@ const renderPayments = () => {
   list.innerHTML = "";
 
   if (!state.payments.length) {
-    list.innerHTML = `<div class="payment-row"><div>No payments yet.</div><div></div><div></div><div></div><div></div></div>`;
+    list.innerHTML = `<div class="payment-row"><div>No wallet activity yet.</div><div></div><div></div><div></div><div></div></div>`;
     return;
   }
 
   state.payments
     .slice()
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort((a, b) => String(b.createdAt || b.date).localeCompare(String(a.createdAt || a.date)))
     .forEach((payment) => {
       const row = document.createElement("div");
       row.className = "payment-row";
+      const amount = Number(payment.amount || 0);
+      const sign = amount > 0 ? "+" : "";
       row.innerHTML = `
-        <div>${payment.date}</div>
-        <div>${payment.status}</div>
-        <div>${payment.customerId}</div>
-        <div>$${Number(payment.amount || 0).toFixed(2)}</div>
-        <div>${payment.orderId}</div>
+        <div>${formatLedgerDate(payment.createdAt || payment.date)}</div>
+        <div>${payment.type || payment.status || "-"}</div>
+        <div>${payment.description || payment.reference || payment.orderId || "-"}</div>
+        <div>${sign}${formatMoney(amount)}</div>
+        <div>${formatMoney(payment.balanceAfter)}</div>
       `;
       list.appendChild(row);
     });
@@ -595,12 +614,16 @@ const toggleLightboxZoom = () => {
 
 const openPayModal = (orderIds) => {
   state.payQueue = orderIds;
-  const total = orderIds.reduce((sum, id) => {
-    const order = state.orders.find((o) => o.id === id);
-    return sum + (order ? getOrderAmount(order) : 0);
-  }, 0);
+  const total = getPayQueueTotal(orderIds);
   const count = orderIds.length;
-  el("payTotal").textContent = `Total: $${total.toFixed(2)} for ${count} order${count > 1 ? "s" : ""}`;
+  el("payTotal").textContent = `Total: ${formatMoney(total)} for ${count} order${count > 1 ? "s" : ""}`;
+  el("payBalance").textContent = `Leaf balance: ${formatMoney(state.leafBalance)}`;
+  const needed = Math.max(0, Number((total - state.leafBalance).toFixed(2)));
+  el("payNeeded").textContent =
+    needed > 0
+      ? `Need ${formatMoney(needed)} more Leaf before payment.`
+      : "Enough Leaf balance to pay now.";
+  el("btnConfirmPay").disabled = needed > 0;
   el("payModal").classList.remove("hidden");
 };
 
@@ -619,10 +642,7 @@ const ensureDatePrefix = (name, createdAt) => {
 
 const closePayModal = () => {
   el("payModal").classList.add("hidden");
-  el("payName").value = "";
-  el("payCard").value = "";
-  el("payExp").value = "";
-  el("payCvc").value = "";
+  state.payQueue = [];
 };
 
 const getOrderAmount = (order) => {
@@ -636,45 +656,156 @@ const getOrderAmount = (order) => {
   return 0;
 };
 
-const markPaid = async (orderIds) => {
-  const today = new Date().toISOString().slice(0, 10);
-
-  for (const id of orderIds) {
+const getPayQueueTotal = (orderIds = state.payQueue) =>
+  orderIds.reduce((sum, id) => {
     const order = state.orders.find((o) => o.id === id);
-    if (!order || order.status === "paid") continue;
-    order.status = "paid";
-    const amount = Number(getOrderAmount(order).toFixed(2));
+    return sum + (order ? getOrderAmount(order) : 0);
+  }, 0);
 
-    state.payments.push({
-      id: `PAY-${Math.floor(Math.random() * 90000 + 10000)}`,
-      date: today,
-      status: "Paid",
-      customerId: `CUS-${Math.floor(Math.random() * 90000 + 10000)}`,
-      orderId: order.id,
-      amount,
-    });
+const mapLedgerToPayments = (ledger = []) =>
+  ledger.map((entry) => ({
+    id: entry.id,
+    createdAt: entry.createdAt,
+    date: formatLedgerDate(entry.createdAt),
+    type: entry.type,
+    description:
+      entry.description ||
+      (entry.order && entry.order.orderNumber ? `Order ${entry.order.orderNumber}` : "Wallet activity"),
+    amount: Number(entry.amount || 0),
+    balanceAfter: Number(entry.balanceAfter || 0),
+    reference: entry.reference || "",
+  }));
 
-    // Sync status to database
-    if (order.dbId) {
-      try {
-        await fetch("/api/orders", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orderNumber: order.id,
-            status: "PAID",
-            paidAt: new Date().toISOString(),
-          }),
-        });
-      } catch (err) {
-        console.error("Failed to sync payment status to database:", err);
-      }
+const fetchWalletFromDB = async () => {
+  const email = state.user && state.user.email;
+  if (!email) return;
+
+  try {
+    const response = await fetch(`/api/wallet?email=${encodeURIComponent(email)}`);
+    const data = await response.json();
+    if (!data.success) return;
+
+    state.leafBalance = Number((data.wallet && data.wallet.leafBalance) || 0);
+    state.leafCurrency = (data.wallet && data.wallet.currency) || "USD";
+    state.payments = mapLedgerToPayments(data.ledger || []);
+    saveState();
+    renderStats();
+    renderPayments();
+
+    if (!el("payModal").classList.contains("hidden") && state.payQueue.length > 0) {
+      openPayModal(state.payQueue);
     }
+  } catch (err) {
+    console.error("Could not fetch wallet data:", err);
+  }
+};
+
+const fetchSubscriptionStatus = async () => {
+  const email = state.user && state.user.email;
+  if (!email) return;
+
+  try {
+    const response = await fetch(`/api/subscription?email=${encodeURIComponent(email)}`);
+    const data = await response.json();
+    if (!data.success) return;
+    state.subscribed = Boolean(data.subscription);
+    saveState();
+  } catch (err) {
+    console.error("Could not fetch subscription status:", err);
+  }
+};
+
+const topupLeaf = async () => {
+  const email = state.user && state.user.email;
+  if (!email) {
+    alert("Please sign in first.");
+    return;
   }
 
-  saveState();
-  renderOrders();
-  renderPayments();
+  const raw = prompt("How many Leaf credits do you want to top up? (1 Leaf = $1)");
+  if (raw === null) return;
+  const amount = Number(raw);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    alert("Please enter a valid amount greater than 0.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "topup",
+        email,
+        amount: Number(amount.toFixed(2)),
+      }),
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      alert(data.error || "Top-up failed.");
+      return;
+    }
+
+    await fetchWalletFromDB();
+    alert(`Top-up successful: +${formatMoney(amount)} Leaf.`);
+  } catch (err) {
+    console.error("Top-up failed:", err);
+    alert("Could not top up Leaf right now.");
+  }
+};
+
+const payOrdersWithLeaf = async (orderIds) => {
+  const email = state.user && state.user.email;
+  if (!email) {
+    alert("Please sign in first.");
+    return false;
+  }
+
+  const selected = orderIds
+    .map((id) => state.orders.find((order) => order.id === id))
+    .filter(Boolean);
+  if (!selected.length) {
+    alert("No valid orders selected.");
+    return false;
+  }
+  const unsynced = selected.filter((order) => !order.dbId);
+  if (unsynced.length) {
+    alert("Some selected orders are not synced to database yet. Please wait and try again.");
+    return false;
+  }
+
+  try {
+    const response = await fetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "pay_orders",
+        email,
+        orderNumbers: selected.map((order) => order.id),
+      }),
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      if (data.code === "INSUFFICIENT_BALANCE") {
+        alert(
+          `Not enough Leaf. Need ${formatMoney(data.missingAmount || 0)} more.\nTop up and try again.`
+        );
+      } else {
+        alert(data.error || "Leaf payment failed.");
+      }
+      return false;
+    }
+
+    await Promise.all([fetchOrdersFromDB(), fetchWalletFromDB()]);
+    alert(`Payment successful for ${data.paidOrders.length} order(s).`);
+    return true;
+  } catch (err) {
+    console.error("Leaf payment failed:", err);
+    alert("Could not complete Leaf payment.");
+    return false;
+  }
 };
 
 // Helper function to fetch media from Dropbox/Google Drive links
@@ -880,14 +1011,18 @@ const setupEvents = () => {
         // Clear previous user's data
         state.orders = [];
         state.payments = [];
+        state.leafBalance = 0;
         localStorage.removeItem(STORAGE_KEY);
 
         state.user = data.user;
+        state.subscribed = Boolean(data.subscription);
         sessionStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
         showApp(data.user);
 
         // Fetch current user's orders from database
         await fetchOrdersFromDB();
+        await fetchWalletFromDB();
+        await fetchSubscriptionStatus();
       } else {
         alert(data.error || "Sign in failed. Please try again.");
       }
@@ -897,12 +1032,15 @@ const setupEvents = () => {
       // Clear previous user's data
       state.orders = [];
       state.payments = [];
+      state.leafBalance = 0;
       localStorage.removeItem(STORAGE_KEY);
 
       const fallbackUser = { id: null, email, name: email.split("@")[0], role: "CLIENT" };
       state.user = fallbackUser;
+      state.subscribed = false;
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(fallbackUser));
       showApp(fallbackUser);
+      await fetchWalletFromDB();
     }
 
     btn.disabled = false;
@@ -913,6 +1051,8 @@ const setupEvents = () => {
     state.user = null;
     state.orders = [];
     state.payments = [];
+    state.leafBalance = 0;
+    state.subscribed = false;
     sessionStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(STORAGE_KEY);
     el("loginScreen").classList.remove("hidden");
@@ -990,10 +1130,13 @@ const setupEvents = () => {
     openPayModal(ids);
   });
 
+  el("btnTopupLeaf").addEventListener("click", topupLeaf);
+  el("btnTopupLeafFromPay").addEventListener("click", topupLeaf);
   el("btnClosePay").addEventListener("click", closePayModal);
-  el("btnConfirmPay").addEventListener("click", () => {
+  el("btnConfirmPay").addEventListener("click", async () => {
     if (!state.payQueue.length) return;
-    markPaid(state.payQueue);
+    const paid = await payOrdersWithLeaf(state.payQueue);
+    if (!paid) return;
     state.selectedOrders.clear();
     closePayModal();
   });
@@ -1041,11 +1184,44 @@ const setupEvents = () => {
     el("subModal").classList.add("hidden");
   });
 
-  el("btnStartSub").addEventListener("click", () => {
-    state.subscribed = true;
-    saveState();
-    el("subModal").classList.add("hidden");
-    alert("Subscription activated. You can now create orders.");
+  el("btnStartSub").addEventListener("click", async () => {
+    const activePlan = document.querySelector(".plan-card.active");
+    const plan = activePlan ? activePlan.dataset.plan : "monthly";
+    const email = state.user && state.user.email;
+
+    if (!email) {
+      alert("Please sign in first.");
+      return;
+    }
+
+    const btn = el("btnStartSub");
+    btn.disabled = true;
+    btn.textContent = "Starting...";
+
+    try {
+      const response = await fetch("/api/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, plan }),
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        alert(data.error || "Could not start subscription.");
+        return;
+      }
+
+      state.subscribed = true;
+      saveState();
+      el("subModal").classList.add("hidden");
+      alert("Subscription activated. You can now create orders.");
+    } catch (err) {
+      console.error("Subscription error:", err);
+      alert("Could not connect to subscription service.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Start subscription";
+    }
   });
 
   document.querySelectorAll(".chip").forEach((chip) => {
@@ -1095,11 +1271,18 @@ const setupEvents = () => {
   });
 
   el("btnExportPayments").addEventListener("click", () => {
-    const rows = [["Payment ID", "Date", "Status", "Customer ID", "Order ID", "Amount"]];
+    const rows = [["Ledger ID", "Date", "Type", "Description", "Amount", "Balance After"]];
     state.payments.forEach((p) => {
-      rows.push([p.id, p.date, p.status, p.customerId, p.orderId, Number(p.amount || 0).toFixed(2)]);
+      rows.push([
+        p.id,
+        formatLedgerDate(p.createdAt || p.date),
+        p.type || "",
+        `"${p.description || ""}"`,
+        Number(p.amount || 0).toFixed(2),
+        Number(p.balanceAfter || 0).toFixed(2),
+      ]);
     });
-    downloadCSV(rows, "renpay-payments.csv");
+    downloadCSV(rows, "renpay-wallet-ledger.csv");
   });
 };
 
@@ -1135,7 +1318,12 @@ const syncLocalOrderToDB = async (order) => {
 const fetchOrdersFromDB = async () => {
   try {
     const email = state.user && state.user.email;
-    const url = email ? `/api/orders?userEmail=${encodeURIComponent(email)}` : "/api/orders";
+    if (!email) {
+      state.orders = [];
+      renderOrders();
+      return;
+    }
+    const url = `/api/orders?userEmail=${encodeURIComponent(email)}`;
     const response = await fetch(url);
     const data = await response.json();
     if (data.success && Array.isArray(data.orders)) {
@@ -1233,6 +1421,7 @@ const restoreSession = () => {
       localStorage.removeItem(STORAGE_KEY);
       state.orders = [];
       state.payments = [];
+      state.leafBalance = 0;
 
       state.user = user;
       showApp(user);
@@ -1253,9 +1442,13 @@ const init = () => {
   renderLineItems();
   setupEvents();
   // Restore session if user was previously logged in
-  restoreSession();
-  // Fetch latest orders from database in background
-  fetchOrdersFromDB();
+  const hasSession = restoreSession();
+  // Fetch latest data from database in background
+  if (hasSession) {
+    fetchOrdersFromDB();
+    fetchWalletFromDB();
+    fetchSubscriptionStatus();
+  }
 };
 
 init();

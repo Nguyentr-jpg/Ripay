@@ -43,51 +43,63 @@ enum PaymentStatus {
   @@map("payment_status")
 }
 
+enum WalletLedgerType {
+  TOPUP
+  ORDER_PAYMENT
+  REFUND
+  ADJUSTMENT
+
+  @@map("wallet_ledger_type")
+}
+
 model User {
-  id              String    @id @default(uuid()) @db.Uuid
-  email           String    @unique @db.VarChar(255)
-  name            String?   @db.VarChar(255)
-  passwordHash    String?   @map("password_hash") @db.VarChar(255)
-  role            UserRole  @default(CLIENT)
-  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id              String         @id @default(uuid()) @db.Uuid
+  email           String         @unique @db.VarChar(255)
+  name            String?        @db.VarChar(255)
+  passwordHash    String?        @map("password_hash") @db.VarChar(255)
+  role            UserRole       @default(CLIENT)
+  emailVerifiedAt DateTime?      @map("email_verified_at") @db.Timestamptz
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   orders          Order[]
   payments        Payment[]
   subscriptions   Subscription[]
+  wallet          Wallet?
+  walletLedgers   WalletLedger[]
 
   @@map("users")
 }
 
 model Order {
-  id          String      @id @default(uuid()) @db.Uuid
-  orderNumber String      @unique @map("order_number") @db.VarChar(50)
-  orderName   String      @map("order_name") @db.VarChar(500)
-  totalCount  Int         @map("total_count")
-  totalAmount Decimal     @map("total_amount") @db.Decimal(10, 2)
-  status      OrderStatus @default(UNPAID)
-  clientId    String?     @map("client_id") @db.VarChar(100)
-  clientName  String?     @map("client_name") @db.VarChar(255)
-  userId      String      @map("user_id") @db.Uuid
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
-  paidAt      DateTime?   @map("paid_at") @db.Timestamptz
-  completedAt DateTime?   @map("completed_at") @db.Timestamptz
-  items       OrderItem[]
-  payments    Payment[]
-  files       File[]
+  id            String         @id @default(uuid()) @db.Uuid
+  orderNumber   String         @unique @map("order_number") @db.VarChar(50)
+  orderName     String         @map("order_name") @db.VarChar(500)
+  totalCount    Int            @map("total_count")
+  totalAmount   Decimal        @map("total_amount") @db.Decimal(10, 2)
+  status        OrderStatus    @default(UNPAID)
+  clientId      String?        @map("client_id") @db.VarChar(100)
+  clientName    String?        @map("client_name") @db.VarChar(255)
+  userId        String         @map("user_id") @db.Uuid
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  paidAt        DateTime?      @map("paid_at") @db.Timestamptz
+  completedAt   DateTime?      @map("completed_at") @db.Timestamptz
+  items         OrderItem[]
+  payments      Payment[]
+  files         File[]
+  walletLedgers WalletLedger[]
 
   @@map("orders")
 }
 
 model OrderItem {
-  id        String   @id @default(uuid()) @db.Uuid
-  orderId   String   @map("order_id") @db.Uuid
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  type      String   @map("item_type") @db.VarChar(500)
-  count     Int      @map("quantity")
-  sourceLink String? @map("source_link") @db.VarChar(2000)
-  unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type       String   @map("item_type") @db.VarChar(500)
+  count      Int      @map("quantity")
+  sourceLink String?  @map("source_link") @db.VarChar(2000)
+  unitPrice  Decimal  @map("unit_price") @db.Decimal(10, 2)
   subtotal   Decimal  @default(0) @db.Decimal(10, 2)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -141,4 +153,38 @@ model Payment {
   completedAt     DateTime?      @map("completed_at") @db.Timestamptz
 
   @@map("payments")
+}
+
+model Wallet {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @unique @map("user_id") @db.Uuid
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Decimal        @default(0) @db.Decimal(12, 2)
+  currency  String         @default("USD") @db.VarChar(10)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  ledgers   WalletLedger[]
+
+  @@map("wallets")
+}
+
+model WalletLedger {
+  id           String           @id @default(uuid()) @db.Uuid
+  walletId     String           @map("wallet_id") @db.Uuid
+  wallet       Wallet           @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId       String           @map("user_id") @db.Uuid
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId      String?          @map("order_id") @db.Uuid
+  order        Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  type         WalletLedgerType @default(ADJUSTMENT)
+  amount       Decimal          @db.Decimal(12, 2)
+  balanceAfter Decimal          @map("balance_after") @db.Decimal(12, 2)
+  currency     String           @default("USD") @db.VarChar(10)
+  description  String?          @db.VarChar(500)
+  reference    String?          @db.VarChar(255)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([walletId, createdAt])
+  @@index([userId, createdAt])
+  @@map("wallet_ledgers")
 }

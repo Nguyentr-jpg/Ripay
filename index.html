@@ -34,7 +34,7 @@
                 Built for real estate photo, video, and floor plan editing. Manage orders, collect
                 card payments, and deliver watermarked previews in one place.
               </p>
-              <div class="pill">Payment gateway: WorldFirst (demo)</div>
+              <div class="pill">Payment gateway: PayPal + Leaf credits</div>
               <div class="login-card">
                 <h2>Sign in</h2>
                 <p>Sign in with email to manage orders and payments.</p>
@@ -101,6 +101,7 @@
                     <p>All orders waiting for payment or already paid.</p>
                   </div>
                   <div class="tab-head-actions">
+                    <button id="btnTopupLeaf" class="btn ghost">Top up Leaf</button>
                     <button id="btnExportOrders" class="btn ghost">Export CSV</button>
                     <button id="btnBulkPay" class="btn primary">Pay selected orders</button>
                   </div>
@@ -151,18 +152,18 @@
               <div id="tab-payments" class="tab">
                 <div class="tab-head">
                   <div>
-                    <h2>Payments</h2>
-                    <p>Payment history from customers.</p>
+                    <h2>Leaf Wallet</h2>
+                    <p>Top-ups and order payments from your Leaf balance.</p>
                   </div>
                   <button id="btnExportPayments" class="btn ghost">Export CSV</button>
                 </div>
                 <div class="payment-table">
                   <div class="payment-row payment-header">
                     <div>Date</div>
-                    <div>Status</div>
-                    <div>Customer ID</div>
+                    <div>Type</div>
+                    <div>Description</div>
                     <div>Amount</div>
-                    <div>Order ID</div>
+                    <div>Balance</div>
                   </div>
                   <div id="paymentList"></div>
                 </div>
@@ -196,31 +197,26 @@
         <div class="modal-head">
           <div>
             <h3>Pay for orders</h3>
-            <div class="modal-sub">WorldFirst gateway (demo)</div>
+            <div class="modal-sub">Leaf credits balance</div>
           </div>
           <button id="btnClosePay" class="btn ghost">Close</button>
         </div>
         <div class="pay-grid">
           <label class="field">
-            <span>Full name</span>
-            <input id="payName" type="text" placeholder="John Doe" />
+            <span>Payment method</span>
+            <input type="text" value="Leaf credits" disabled />
           </label>
           <label class="field">
-            <span>Card number</span>
-            <input id="payCard" type="text" placeholder="4242 4242 4242 4242" />
-          </label>
-          <label class="field">
-            <span>Expiry</span>
-            <input id="payExp" type="text" placeholder="MM/YY" />
-          </label>
-          <label class="field">
-            <span>CVC</span>
-            <input id="payCvc" type="text" placeholder="123" />
+            <span>Rate</span>
+            <input type="text" value="1 Leaf = $1.00 USD" disabled />
           </label>
         </div>
         <div id="payTotal" class="pay-total"></div>
+        <div id="payBalance" class="pay-total"></div>
+        <div id="payNeeded" class="pay-total"></div>
         <div class="modal-actions">
-          <button id="btnConfirmPay" class="btn primary">Confirm payment</button>
+          <button id="btnTopupLeafFromPay" class="btn ghost">Top up Leaf</button>
+          <button id="btnConfirmPay" class="btn primary">Pay with Leaf</button>
         </div>
       </div>
     </div>
