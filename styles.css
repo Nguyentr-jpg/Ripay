@@ -839,6 +839,11 @@ main {
   text-align: right;
 }
 
+.paypal-topup-box {
+  min-height: 44px;
+  margin-top: 12px;
+}
+
 .order-name {
   font-weight: 600;
 }

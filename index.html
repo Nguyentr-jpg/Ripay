@@ -221,6 +221,25 @@
       </div>
     </div>
 
+    <div id="topupModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-head">
+          <div>
+            <h3>Top up Leaf</h3>
+            <div class="modal-sub">PayPal Sandbox checkout (1 Leaf = $1 USD)</div>
+          </div>
+          <button id="btnCloseTopup" class="btn ghost">Close</button>
+        </div>
+        <label class="field">
+          <span>Leaf amount</span>
+          <input id="leafTopupAmount" type="number" min="1" step="0.01" value="20" />
+        </label>
+        <div id="leafTopupSummary" class="pay-total"></div>
+        <div id="paypalTopupContainer" class="paypal-topup-box"></div>
+        <div id="paypalTopupHint" class="hint"></div>
+      </div>
+    </div>
+
     <div id="lightbox" class="lightbox hidden" aria-hidden="true">
       <button id="btnCloseLightbox" class="lightbox-close" aria-label="Close">×</button>
       <button id="btnPrevLightbox" class="lightbox-nav prev" aria-label="Previous">‹</button>
@@ -292,6 +311,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=20260212-6"></script>
+    <script src="app.js?v=20260212-7"></script>
   </body>
 </html>

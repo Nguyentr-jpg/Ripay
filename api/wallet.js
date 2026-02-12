@@ -15,6 +15,22 @@ function getPrisma() {
   return prisma;
 }
 
+function getErrorHint(error) {
+  if (error.code === "P2021") {
+    return "Wallet tables do not exist yet. Run 'npx prisma db push' and redeploy.";
+  }
+  if (error.code === "P1001") {
+    return "Cannot reach database. Check DATABASE_URL in Vercel.";
+  }
+  if (error.code === "P1000") {
+    return "Database authentication failed. Check DATABASE_URL credentials.";
+  }
+  if (error.code === "P1008") {
+    return "Database request timeout. Retry and check database load.";
+  }
+  return error.message || "Wallet service unavailable.";
+}
+
 function toMoney(value) {
   const number = Number(value || 0);
   return Number.isFinite(number) ? Number(number.toFixed(2)) : 0;
@@ -76,7 +92,8 @@ module.exports = async function handler(req, res) {
     console.error("Wallet API Error:", error);
     return res.status(500).json({
       error: "Wallet service error",
-      hint: error.message,
+      hint: getErrorHint(error),
+      code: error.code || null,
     });
   }
 };

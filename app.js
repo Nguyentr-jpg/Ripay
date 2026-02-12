@@ -9,6 +9,9 @@ const state = {
   payments: [],
   leafBalance: 0,
   leafCurrency: "USD",
+  paypalClientId: "",
+  paypalSdkLoaded: false,
+  topupAmount: 20,
   selectedOrders: new Set(),
   activeOrderId: null,
   payQueue: [],
@@ -20,6 +23,8 @@ const state = {
 };
 
 const el = (id) => document.getElementById(id);
+let paypalSdkPromise = null;
+
 const getFileNameFromUrl = (url) => {
   if (!url) return "";
   try {
@@ -683,7 +688,10 @@ const fetchWalletFromDB = async () => {
   try {
     const response = await fetch(`/api/wallet?email=${encodeURIComponent(email)}`);
     const data = await response.json();
-    if (!data.success) return;
+    if (!response.ok || !data.success) {
+      console.error("Wallet API error:", data);
+      return;
+    }
 
     state.leafBalance = Number((data.wallet && data.wallet.leafBalance) || 0);
     state.leafCurrency = (data.wallet && data.wallet.currency) || "USD";
@@ -715,44 +723,169 @@ const fetchSubscriptionStatus = async () => {
   }
 };
 
+const fetchPayPalConfig = async () => {
+  if (state.paypalClientId) {
+    return state.paypalClientId;
+  }
+
+  const response = await fetch("/api/paypal");
+  const data = await response.json();
+  if (!response.ok || !data.success || !data.clientId) {
+    throw new Error(data.error || data.hint || "PayPal is not configured.");
+  }
+
+  state.paypalClientId = data.clientId;
+  return state.paypalClientId;
+};
+
+const ensurePayPalSdkLoaded = async () => {
+  if (window.paypal && typeof window.paypal.Buttons === "function") {
+    state.paypalSdkLoaded = true;
+    return;
+  }
+
+  if (!paypalSdkPromise) {
+    paypalSdkPromise = (async () => {
+      const clientId = await fetchPayPalConfig();
+      const src =
+        "https://www.paypal.com/sdk/js" +
+        `?client-id=${encodeURIComponent(clientId)}` +
+        "&currency=USD&intent=capture&components=buttons";
+
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Failed to load PayPal SDK."));
+        document.head.appendChild(script);
+      });
+    })();
+  }
+
+  try {
+    await paypalSdkPromise;
+  } catch (err) {
+    paypalSdkPromise = null;
+    throw err;
+  }
+  state.paypalSdkLoaded = !!(window.paypal && typeof window.paypal.Buttons === "function");
+};
+
+const closeTopupModal = () => {
+  el("topupModal").classList.add("hidden");
+};
+
+const renderPayPalTopupButton = async () => {
+  const container = el("paypalTopupContainer");
+  const hint = el("paypalTopupHint");
+  const email = state.user && state.user.email;
+  const amount = Number(el("leafTopupAmount").value || state.topupAmount || 0);
+  state.topupAmount = amount;
+
+  el("leafTopupSummary").textContent = `Top-up amount: ${formatMoney(amount)} = ${amount.toFixed(2)} Leaf`;
+
+  if (!email) {
+    container.innerHTML = "";
+    hint.textContent = "Please sign in before topping up Leaf.";
+    return;
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    container.innerHTML = "";
+    hint.textContent = "Enter an amount greater than 0.";
+    return;
+  }
+
+  hint.textContent = "Loading PayPal checkout...";
+
+  try {
+    await ensurePayPalSdkLoaded();
+  } catch (err) {
+    container.innerHTML = "";
+    hint.textContent = err.message || "Could not load PayPal checkout.";
+    return;
+  }
+
+  if (!window.paypal || typeof window.paypal.Buttons !== "function") {
+    container.innerHTML = "";
+    hint.textContent = "PayPal checkout is unavailable in this browser.";
+    return;
+  }
+
+  container.innerHTML = "";
+  hint.textContent = "Use a PayPal Sandbox buyer account (or sandbox card) to complete top-up.";
+
+  window.paypal
+    .Buttons({
+      style: {
+        layout: "vertical",
+        shape: "rect",
+        label: "paypal",
+      },
+      createOrder: async () => {
+        const createResponse = await fetch("/api/paypal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "create_order",
+            amount: Number(amount.toFixed(2)),
+            email,
+          }),
+        });
+        const createData = await createResponse.json();
+        if (!createResponse.ok || !createData.success || !createData.orderId) {
+          throw new Error(createData.error || createData.hint || "Could not create PayPal order.");
+        }
+        return createData.orderId;
+      },
+      onApprove: async (data) => {
+        const captureResponse = await fetch("/api/paypal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "capture_order",
+            orderId: data.orderID,
+            email,
+          }),
+        });
+        const captureData = await captureResponse.json();
+        if (!captureResponse.ok || !captureData.success) {
+          throw new Error(captureData.error || captureData.hint || "Could not capture PayPal payment.");
+        }
+
+        await fetchWalletFromDB();
+        closeTopupModal();
+        alert(`Leaf top-up successful: +${formatMoney(captureData.amount)}.`);
+      },
+      onCancel: () => {
+        hint.textContent = "Payment was cancelled.";
+      },
+      onError: (err) => {
+        console.error("PayPal top-up error:", err);
+        alert(err && err.message ? err.message : "PayPal top-up failed.");
+      },
+    })
+    .render("#paypalTopupContainer")
+    .catch((err) => {
+      console.error("PayPal render error:", err);
+      hint.textContent = "Could not render PayPal button.";
+    });
+};
+
+const openTopupModal = async () => {
+  el("topupModal").classList.remove("hidden");
+  el("leafTopupAmount").value = String(state.topupAmount || 20);
+  await renderPayPalTopupButton();
+};
+
 const topupLeaf = async () => {
   const email = state.user && state.user.email;
   if (!email) {
     alert("Please sign in first.");
     return;
   }
-
-  const raw = prompt("How many Leaf credits do you want to top up? (1 Leaf = $1)");
-  if (raw === null) return;
-  const amount = Number(raw);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    alert("Please enter a valid amount greater than 0.");
-    return;
-  }
-
-  try {
-    const response = await fetch("/api/wallet", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "topup",
-        email,
-        amount: Number(amount.toFixed(2)),
-      }),
-    });
-    const data = await response.json();
-
-    if (!data.success) {
-      alert(data.error || "Top-up failed.");
-      return;
-    }
-
-    await fetchWalletFromDB();
-    alert(`Top-up successful: +${formatMoney(amount)} Leaf.`);
-  } catch (err) {
-    console.error("Top-up failed:", err);
-    alert("Could not top up Leaf right now.");
-  }
+  await openTopupModal();
 };
 
 const payOrdersWithLeaf = async (orderIds) => {
@@ -1132,6 +1265,8 @@ const setupEvents = () => {
 
   el("btnTopupLeaf").addEventListener("click", topupLeaf);
   el("btnTopupLeafFromPay").addEventListener("click", topupLeaf);
+  el("btnCloseTopup").addEventListener("click", closeTopupModal);
+  el("leafTopupAmount").addEventListener("change", renderPayPalTopupButton);
   el("btnClosePay").addEventListener("click", closePayModal);
   el("btnConfirmPay").addEventListener("click", async () => {
     if (!state.payQueue.length) return;
