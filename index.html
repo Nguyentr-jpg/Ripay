@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260212-1" />
   </head>
   <body>
     <div id="app">
@@ -225,10 +225,16 @@
       </div>
     </div>
 
-    <div id="lightbox" class="lightbox hidden">
-      <button id="btnCloseLightbox" class="btn ghost">Close</button>
-      <div class="lightbox-content">
+    <div id="lightbox" class="lightbox hidden" aria-hidden="true">
+      <button id="btnCloseLightbox" class="lightbox-close" aria-label="Close">×</button>
+      <button id="btnPrevLightbox" class="lightbox-nav prev" aria-label="Previous">‹</button>
+      <button id="btnNextLightbox" class="lightbox-nav next" aria-label="Next">›</button>
+      <div id="lightboxContent" class="lightbox-content">
         <img id="lightboxImg" alt="Preview full" />
+      </div>
+      <div class="lightbox-footer">
+        <div id="lightboxName" class="lightbox-name"></div>
+        <div id="lightboxCount" class="lightbox-count"></div>
       </div>
     </div>
 
@@ -290,6 +296,6 @@
       </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=20260212-1"></script>
   </body>
 </html>

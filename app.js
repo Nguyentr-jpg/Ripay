@@ -10,9 +10,24 @@ const state = {
   selectedOrders: new Set(),
   activeOrderId: null,
   payQueue: [],
+  lightbox: {
+    items: [],
+    index: 0,
+    zoomed: false,
+  },
 };
 
 const el = (id) => document.getElementById(id);
+const getFileNameFromUrl = (url) => {
+  if (!url) return "";
+  try {
+    const clean = url.split("?")[0];
+    const parts = clean.split("/");
+    return parts[parts.length - 1] || "";
+  } catch (err) {
+    return "";
+  }
+};
 
 const seedData = () => ({
   orders: [
@@ -234,13 +249,13 @@ const addLineItem = (item = { type: "", count: 0, link: "", unitPrice: 0 }) => {
   row.className = "line-item";
   row.dataset.unitPrice = item.unitPrice || 0;
   row.innerHTML = `
-    <input type="text" placeholder="Order name (address + service)" value="${item.type}" />
+    <input data-field="type" type="text" placeholder="Order name (address + service)" value="${item.type}" />
     <div class="quantity-wrap">
-      <input type="number" min="1" placeholder="Quantity" value="${item.count || ""}" />
+      <input data-field="count" type="number" min="1" placeholder="Quantity" value="${item.count || ""}" />
       <button class="price-btn" data-price>...</button>
       <div class="price-hint">Unit price: $<span>${Number(item.unitPrice || 0).toFixed(2)}</span></div>
     </div>
-    <input type="text" placeholder="Link" value="${item.link}" />
+    <input data-field="link" type="text" placeholder="Link" value="${item.link}" />
     <button class="btn ghost" data-remove>–</button>
   `;
 
@@ -335,37 +350,73 @@ const renderOrderDetail = (order) => {
   `;
 };
 
-const renderGalleryItems = (order, mediaFiles) => {
+const renderGalleryGrid = (order) => {
   const grid = el("galleryGrid");
   grid.innerHTML = "";
+  const lightboxItems = [];
 
-  mediaFiles.forEach((file) => {
+  // Use mediaFiles if available (from Dropbox/Drive), otherwise fallback to links
+  const mediaFiles = order.mediaFiles || [];
+
+  if (mediaFiles.length > 0) {
+    // Display fetched media files
+    mediaFiles.forEach((file) => {
+      const item = document.createElement("div");
+      item.className = "gallery-item";
+      const src = file.previewUrl || file.downloadUrl || file.url || file.thumbnailUrl;
+      const name = file.name || getFileNameFromUrl(src);
+
+      if (src) {
+        const thumb = file.thumbnailUrl || src;
+        item.style.backgroundImage = `url('${thumb}')`;
+        item.dataset.src = src;
+        item.dataset.fileName = name;
+        item.dataset.index = String(lightboxItems.length);
+        lightboxItems.push({ src, name });
+      }
+
+      // Add paid/unpaid overlay
+      if (order.status === 'unpaid') {
+        item.classList.add('watermarked');
+      }
+
+      item.addEventListener("click", () => {
+        const index = Number(item.dataset.index || -1);
+        openLightbox(index);
+      });
+      grid.appendChild(item);
+    });
+    state.lightbox.items = lightboxItems;
+    return;
+  }
+
+  // Fallback to old link parsing method
+  const links = order.items
+    ? order.items.flatMap((item) => parseLinks(item.link).map(normalizeImageUrl))
+    : [];
+  const previewCount = links.length
+    ? links.length
+    : Math.min(order.totalCount, 16);
+
+  for (let i = 0; i < previewCount; i += 1) {
     const item = document.createElement("div");
     item.className = "gallery-item";
-
-    if (file.thumbnailUrl) {
-      item.style.backgroundImage = `url('${file.thumbnailUrl}')`;
-      item.dataset.src = file.thumbnailUrl;
-      item.dataset.fileName = file.name;
+    if (links[i] && (isImageUrl(links[i]) || isPreviewHost(links[i]))) {
+      item.style.backgroundImage = `url('${links[i]}')`;
+      item.dataset.src = links[i];
+      item.dataset.index = String(lightboxItems.length);
+      lightboxItems.push({ src: links[i], name: getFileNameFromUrl(links[i]) });
+    } else if (links[i]) {
+      item.dataset.src = "";
+      item.classList.add("link-only");
     }
-
-    if (order.status === 'unpaid') {
-      item.classList.add('watermarked');
-    }
-
-    item.addEventListener("click", () => openLightbox(item.dataset.src));
+    item.addEventListener("click", () => {
+      const index = Number(item.dataset.index || -1);
+      openLightbox(index);
+    });
     grid.appendChild(item);
-  });
-};
-
-const getOrderLink = (order) => {
-  if (!order.items) return null;
-  for (const item of order.items) {
-    if (item.link && (item.link.includes('dropbox.com') || item.link.includes('drive.google.com'))) {
-      return item.link;
-    }
   }
-  return null;
+  state.lightbox.items = lightboxItems;
 };
 
 const openGallery = async (orderId) => {
@@ -375,34 +426,43 @@ const openGallery = async (orderId) => {
   state.activeOrderId = orderId;
   el("galleryTitle").textContent = order.name;
   renderOrderDetail(order);
-
-  const grid = el("galleryGrid");
-  grid.innerHTML = "";
-
-  // Show modal immediately with spinner
   el("galleryModal").classList.remove("hidden");
 
-  let mediaFiles = order.mediaFiles || [];
+  const links = order.items
+    ? order.items
+        .map((item) => item.link || item.sourceLink || item.source_link)
+        .filter(Boolean)
+    : [];
+  const needsRefresh =
+    Array.isArray(order.mediaFiles) &&
+    order.mediaFiles.length > 0 &&
+    order.mediaFiles.every((file) => {
+      const src = file.previewUrl || file.downloadUrl || file.url || "";
+      return !src || src.startsWith("data:image/");
+    });
+  const shouldFetch = ((!order.mediaFiles || order.mediaFiles.length === 0) || needsRefresh) && links.length > 0;
 
-  if (mediaFiles.length > 0) {
-    renderGalleryItems(order, mediaFiles);
-  } else {
-    // Try to re-fetch from Dropbox/Drive if order has a link
-    const link = getOrderLink(order);
-    if (link) {
-      grid.innerHTML = '<div class="gallery-loading"><div class="spinner"></div><div>Loading media from cloud...</div></div>';
-      const fetched = await fetchMediaFromLink(link);
-      if (fetched && fetched.length > 0) {
-        order.mediaFiles = fetched;
-        saveState();
-        renderGalleryItems(order, fetched);
-      } else {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#888;">No media files found.</div>';
+  if (shouldFetch) {
+    const grid = el("galleryGrid");
+    grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 24px;">Loading previews...</div>`;
+
+    const uniqueLinks = Array.from(new Set(links));
+    const fetchedFiles = [];
+
+    for (const link of uniqueLinks) {
+      const files = await fetchMediaFromLink(link);
+      if (Array.isArray(files) && files.length > 0) {
+        fetchedFiles.push(...files);
       }
-    } else {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#888;">No media files available.</div>';
+    }
+
+    if (fetchedFiles.length > 0) {
+      order.mediaFiles = fetchedFiles;
+      saveState();
     }
   }
+
+  renderGalleryGrid(order);
 };
 
 const closeGallery = () => {
@@ -410,19 +470,60 @@ const closeGallery = () => {
   state.activeOrderId = null;
 };
 
-const openLightbox = (src) => {
-  if (src && (src.startsWith('data:image/') || isImageUrl(src) || isPreviewHost(src))) {
-    el("lightboxImg").src = src;
-    el("lightbox").classList.remove("hidden");
+const updateLightboxNav = () => {
+  const count = state.lightbox.items.length;
+  const disable = count <= 1;
+  el("btnPrevLightbox").disabled = disable;
+  el("btnNextLightbox").disabled = disable;
+};
+
+const resetLightboxZoom = () => {
+  state.lightbox.zoomed = false;
+  el("lightboxContent").classList.remove("zoomed");
+};
+
+const setLightboxIndex = (index) => {
+  const items = state.lightbox.items;
+  if (!items.length) return;
+  const count = items.length;
+  const nextIndex = ((index % count) + count) % count;
+  state.lightbox.index = nextIndex;
+
+  const current = items[nextIndex];
+  el("lightboxImg").src = current.src;
+  el("lightboxName").textContent = current.name || "Preview image";
+  el("lightboxCount").textContent = `${nextIndex + 1} / ${count}`;
+  resetLightboxZoom();
+  updateLightboxNav();
+};
+
+const openLightbox = (index) => {
+  const items = state.lightbox.items;
+  if (!items.length || index < 0 || index >= items.length) {
+    alert("Link này không hiển thị được. Hãy dùng link ảnh trực tiếp hoặc link file Dropbox/Google Drive.");
     return;
   }
 
-  alert("Link này không hiển thị được. Hãy dùng link ảnh trực tiếp hoặc link file Dropbox/Google Drive.");
+  el("lightbox").classList.remove("hidden");
+  el("lightbox").setAttribute("aria-hidden", "false");
+  setLightboxIndex(index);
 };
 
 const closeLightbox = () => {
   el("lightbox").classList.add("hidden");
+  el("lightbox").setAttribute("aria-hidden", "true");
   el("lightboxImg").src = "";
+  resetLightboxZoom();
+};
+
+const stepLightbox = (delta) => {
+  if (!state.lightbox.items.length) return;
+  setLightboxIndex(state.lightbox.index + delta);
+};
+
+const toggleLightboxZoom = () => {
+  state.lightbox.zoomed = !state.lightbox.zoomed;
+  el("lightboxContent").classList.toggle("zoomed", state.lightbox.zoomed);
 };
 
 const openPayModal = (orderIds) => {
@@ -553,11 +654,13 @@ const createOrder = async () => {
 
   const rows = Array.from(el("lineItems").children);
   const items = rows.map((row) => {
-    const inputs = row.querySelectorAll("input");
+    const typeInput = row.querySelector('[data-field="type"]');
+    const countInput = row.querySelector('[data-field="count"]');
+    const linkInput = row.querySelector('[data-field="link"]');
     return {
-      type: inputs[0].value.trim(),
-      count: Number(inputs[1].value || 0),
-      link: inputs[2] ? inputs[2].value.trim() : "",
+      type: typeInput ? typeInput.value.trim() : "",
+      count: Number((countInput && countInput.value) || 0),
+      link: linkInput ? linkInput.value.trim() : "",
       unitPrice: Number(row.dataset.unitPrice || 0),
     };
   });
@@ -603,7 +706,7 @@ const createOrder = async () => {
           clientId,
           clientName: (state.user && state.user.email) || "client@email.com",
           userEmail: (state.user && state.user.email) || "client@email.com",
-          items: [item],
+          items: [{ ...item, sourceLink: item.link }],
         }),
       });
 
@@ -617,7 +720,7 @@ const createOrder = async () => {
           items: (data.order.items || []).map((i) => ({
             type: i.type,
             count: Number(i.count),
-            link: i.sourceLink || "",
+            link: i.sourceLink || i.source_link || i.link || "",
             unitPrice: Number(i.unitPrice),
           })),
           mediaFiles: mediaFiles || [], // Store fetched media files
@@ -713,7 +816,6 @@ const setupEvents = () => {
         localStorage.removeItem(STORAGE_KEY);
 
         state.user = data.user;
-        state.subscribed = Boolean(data.subscription);
         sessionStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
         showApp(data.user);
 
@@ -828,8 +930,27 @@ const setupEvents = () => {
   });
 
   el("btnCloseLightbox").addEventListener("click", closeLightbox);
+  el("btnPrevLightbox").addEventListener("click", () => stepLightbox(-1));
+  el("btnNextLightbox").addEventListener("click", () => stepLightbox(1));
+  el("lightboxImg").addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleLightboxZoom();
+  });
   el("lightbox").addEventListener("click", (event) => {
     if (event.target.id === "lightbox") closeLightbox();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (el("lightbox").classList.contains("hidden")) return;
+    if (event.key === "Escape") {
+      closeLightbox();
+      return;
+    }
+    if (event.key === "ArrowLeft") {
+      stepLightbox(-1);
+    }
+    if (event.key === "ArrowRight") {
+      stepLightbox(1);
+    }
   });
 
   el("btnOpenFeedback").addEventListener("click", () => {
@@ -851,42 +972,11 @@ const setupEvents = () => {
     el("subModal").classList.add("hidden");
   });
 
-  el("btnStartSub").addEventListener("click", async () => {
-    if (!state.user || !state.user.email) {
-      alert("Please sign in first.");
-      return;
-    }
-
-    const selectedPlan = document.querySelector(".plan-card.active");
-    const plan = selectedPlan && selectedPlan.dataset.plan ? selectedPlan.dataset.plan : "monthly";
-
-    const btn = el("btnStartSub");
-    btn.disabled = true;
-    btn.textContent = "Activating...";
-
-    try {
-      const response = await fetch("/api/subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: state.user.email, plan }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        state.subscribed = true;
-        saveState();
-        el("subModal").classList.add("hidden");
-        alert("Subscription activated! You can now create orders.");
-      } else {
-        alert(data.error || "Failed to activate subscription.");
-      }
-    } catch (err) {
-      console.error("Subscription error:", err);
-      alert("Network error. Please try again.");
-    }
-
-    btn.disabled = false;
-    btn.textContent = "Start subscription";
+  el("btnStartSub").addEventListener("click", () => {
+    state.subscribed = true;
+    saveState();
+    el("subModal").classList.add("hidden");
+    alert("Subscription activated. You can now create orders.");
   });
 
   document.querySelectorAll(".chip").forEach((chip) => {
@@ -990,7 +1080,7 @@ const fetchOrdersFromDB = async () => {
           items: (o.items || []).map((i) => ({
             type: i.type,
             count: Number(i.count),
-            link: i.sourceLink || "",
+            link: i.sourceLink || i.source_link || i.link || "",
             unitPrice: Number(i.unitPrice),
           })),
           mediaFiles: existingOrder?.mediaFiles || [], // Preserve mediaFiles if exists
@@ -1028,7 +1118,7 @@ const fetchOrdersFromDB = async () => {
               items: (o.items || []).map((i) => ({
                 type: i.type,
                 count: Number(i.count),
-                link: i.link || "",
+                link: i.sourceLink || i.source_link || i.link || "",
                 unitPrice: Number(i.unitPrice),
               })),
               mediaFiles: existingOrder?.mediaFiles || [], // Preserve mediaFiles if exists
@@ -1064,22 +1154,7 @@ const showApp = (user) => {
   el("appScreen").classList.remove("hidden");
 };
 
-const checkSubscription = async (email) => {
-  try {
-    const response = await fetch(`/api/subscription?email=${encodeURIComponent(email)}`);
-    const data = await response.json();
-    if (data.success && data.subscription) {
-      state.subscribed = true;
-      return true;
-    }
-  } catch (err) {
-    console.error("Failed to check subscription:", err);
-  }
-  state.subscribed = false;
-  return false;
-};
-
-const restoreSession = async () => {
+const restoreSession = () => {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return false;
@@ -1092,7 +1167,6 @@ const restoreSession = async () => {
 
       state.user = user;
       showApp(user);
-      await checkSubscription(user.email);
       return true;
     }
   } catch (err) {
@@ -1102,7 +1176,7 @@ const restoreSession = async () => {
   return false;
 };
 
-const init = async () => {
+const init = () => {
   // Don't load localStorage on init - we'll fetch from database instead
   // This prevents showing the wrong user's data
   renderOrders();
@@ -1110,7 +1184,7 @@ const init = async () => {
   renderLineItems();
   setupEvents();
   // Restore session if user was previously logged in
-  await restoreSession();
+  restoreSession();
   // Fetch latest orders from database in background
   fetchOrdersFromDB();
 };
