@@ -339,6 +339,12 @@ const isLikelyLowResUrl = (url) => {
   return /(thumbnail|get_thumbnail|=s\d{2,4})(?:[?&]|$)/i.test(url);
 };
 
+const sanitizeLightboxSrc = (url) => {
+  if (!url) return "";
+  if (url.includes("/api/dropbox-file")) return "";
+  return url;
+};
+
 const renderOrderDetail = (order) => {
   const detail = el("orderDetail");
   const amount = getOrderAmount(order);
@@ -387,7 +393,7 @@ const renderGalleryGrid = (order) => {
     mediaFiles.forEach((file) => {
       const item = document.createElement("div");
       item.className = "gallery-item";
-      const src = file.downloadUrl || file.previewUrl || file.url || "";
+      const src = sanitizeLightboxSrc(file.downloadUrl || file.previewUrl || file.url || "");
       const name = file.name || getFileNameFromUrl(src);
 
       const thumb = file.thumbnailUrl || src || file.url || "";
@@ -395,11 +401,12 @@ const renderGalleryGrid = (order) => {
         item.style.backgroundImage = `url('${thumb}')`;
       }
 
-      if (src) {
+      const lightboxSrc = src || thumb;
+      if (lightboxSrc) {
         item.dataset.src = src;
         item.dataset.fileName = name;
         item.dataset.index = String(lightboxItems.length);
-        lightboxItems.push({ src, name });
+        lightboxItems.push({ src: lightboxSrc, fallbackSrc: thumb, name });
       } else {
         item.classList.add("link-only");
       }
@@ -519,7 +526,15 @@ const setLightboxIndex = (index) => {
   state.lightbox.index = nextIndex;
 
   const current = items[nextIndex];
-  el("lightboxImg").src = current.src;
+  const lightboxImg = el("lightboxImg");
+  lightboxImg.onerror = () => {
+    if (current.fallbackSrc && lightboxImg.src !== current.fallbackSrc) {
+      lightboxImg.src = current.fallbackSrc;
+      return;
+    }
+    lightboxImg.onerror = null;
+  };
+  lightboxImg.src = current.src;
   el("lightboxName").textContent = current.name || "Preview image";
   el("lightboxCount").textContent = `${nextIndex + 1} / ${count}`;
   resetLightboxZoom();
