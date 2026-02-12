@@ -90,14 +90,31 @@ const loadState = () => {
 };
 
 const saveState = () => {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      orders: state.orders,
-      payments: state.payments,
-      subscribed: state.subscribed,
-    })
-  );
+  const stripInlineThumb = (file) => {
+    if (!file || typeof file !== "object") return file;
+    const thumbnailUrl = typeof file.thumbnailUrl === "string" ? file.thumbnailUrl : "";
+    if (thumbnailUrl.startsWith("data:image/")) {
+      return { ...file, thumbnailUrl: "" };
+    }
+    return file;
+  };
+
+  const compactOrders = (state.orders || []).map((order) => ({
+    ...order,
+    mediaFiles: Array.isArray(order.mediaFiles) ? order.mediaFiles.map(stripInlineThumb) : order.mediaFiles,
+  }));
+
+  const payload = {
+    orders: compactOrders,
+    payments: state.payments,
+    subscribed: state.subscribed,
+  };
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.error("Failed to persist state to localStorage:", err);
+  }
 };
 
 const downloadCSV = (rows, filename) => {
