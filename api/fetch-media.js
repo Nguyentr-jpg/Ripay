@@ -66,8 +66,9 @@ async function fetchFromGoogleDrive(folderId, apiKey) {
         id: file.id,
         name: file.name,
         type: file.mimeType,
-        thumbnailUrl: file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s400') : null,
-        downloadUrl: file.webContentLink,
+        thumbnailUrl: file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s2048') : null,
+        previewUrl: `https://drive.google.com/uc?export=view&id=${file.id}`,
+        downloadUrl: `https://drive.google.com/uc?export=download&id=${file.id}`,
         provider: 'google-drive'
       }));
 
@@ -192,6 +193,8 @@ async function fetchFromDropbox(sharedLink, accessToken) {
       const batchResults = await Promise.all(
         batch.map(async (file) => {
           try {
+            const filePath = file.path_lower || file.path_display || file.id;
+            const proxyUrl = `/api/dropbox-file?link=${encodeURIComponent(finalUrl)}&path=${encodeURIComponent(filePath)}`;
             // Use file ID directly (works since token owner has access)
             const thumbResponse = await fetch(
               'https://content.dropboxapi.com/2/files/get_thumbnail_v2',
@@ -202,16 +205,17 @@ async function fetchFromDropbox(sharedLink, accessToken) {
                   'Dropbox-API-Arg': JSON.stringify({
                     resource: {
                       '.tag': 'path',
-                      path: file.id
+                      path: filePath
                     },
                     format: 'jpeg',
-                    size: 'w256h256'
+                    size: 'w2048h1536'
                   })
                 }
               }
             );
 
             let thumbnailUrl = null;
+            let previewUrl = proxyUrl;
             if (thumbResponse.ok) {
               const arrayBuffer = await thumbResponse.arrayBuffer();
               const base64 = Buffer.from(arrayBuffer).toString('base64');
@@ -225,7 +229,8 @@ async function fetchFromDropbox(sharedLink, accessToken) {
               name: file.name,
               type: file.name.match(/\.(mp4|mov|avi)$/i) ? 'video' : 'image',
               thumbnailUrl,
-              downloadUrl: null,
+              previewUrl,
+              downloadUrl: previewUrl,
               provider: 'dropbox'
             };
           } catch (err) {

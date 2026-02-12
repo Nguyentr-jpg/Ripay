@@ -315,6 +315,12 @@ const isImageUrl = (url) =>
 const isPreviewHost = (url) =>
   /dropbox\.com|drive\.google\.com|googleusercontent\.com/i.test(url);
 
+const isLikelyLowResUrl = (url) => {
+  if (!url) return true;
+  if (url.startsWith("data:image/")) return true;
+  return /(thumbnail|get_thumbnail|=s\d{2,4})(?:[?&]|$)/i.test(url);
+};
+
 const renderOrderDetail = (order) => {
   const detail = el("orderDetail");
   const amount = getOrderAmount(order);
@@ -363,16 +369,21 @@ const renderGalleryGrid = (order) => {
     mediaFiles.forEach((file) => {
       const item = document.createElement("div");
       item.className = "gallery-item";
-      const src = file.previewUrl || file.downloadUrl || file.url || file.thumbnailUrl;
+      const src = file.downloadUrl || file.previewUrl || file.url || "";
       const name = file.name || getFileNameFromUrl(src);
 
-      if (src) {
-        const thumb = file.thumbnailUrl || src;
+      const thumb = file.thumbnailUrl || src || file.url || "";
+      if (thumb) {
         item.style.backgroundImage = `url('${thumb}')`;
+      }
+
+      if (src) {
         item.dataset.src = src;
         item.dataset.fileName = name;
         item.dataset.index = String(lightboxItems.length);
         lightboxItems.push({ src, name });
+      } else {
+        item.classList.add("link-only");
       }
 
       // Add paid/unpaid overlay
@@ -436,9 +447,9 @@ const openGallery = async (orderId) => {
   const needsRefresh =
     Array.isArray(order.mediaFiles) &&
     order.mediaFiles.length > 0 &&
-    order.mediaFiles.every((file) => {
-      const src = file.previewUrl || file.downloadUrl || file.url || "";
-      return !src || src.startsWith("data:image/");
+    order.mediaFiles.some((file) => {
+      const src = file.downloadUrl || file.previewUrl || file.url || "";
+      return !src || isLikelyLowResUrl(src);
     });
   const shouldFetch = ((!order.mediaFiles || order.mediaFiles.length === 0) || needsRefresh) && links.length > 0;
 
