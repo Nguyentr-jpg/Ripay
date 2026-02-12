@@ -89,7 +89,6 @@ model OrderItem {
   sourceLink String? @map("source_link") @db.VarChar(2000)
   unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
   subtotal   Decimal  @default(0) @db.Decimal(10, 2)
-  sourceLink String?  @map("source_link") @db.VarChar(1000)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("order_items")
