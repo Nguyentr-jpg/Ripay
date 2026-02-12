@@ -207,8 +207,10 @@ async function fetchFromDropbox(sharedLink, accessToken) {
                       path: filePath
                     },
                     format: 'jpeg',
-                    // Small thumbnail for quick gallery rendering
-                    size: 'w128h128'
+                    // Higher-res thumbnail for sharper gallery cards
+                    // Dropbox thumbnail API uses preset sizes (no exact 360px long side).
+                    // w480h320 is the closest practical option above 360.
+                    size: 'w480h320'
                   })
                 }
               }
