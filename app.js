@@ -1345,6 +1345,8 @@ const createOrder = async () => {
   }
 
   const rows = Array.from(el("lineItems").children);
+  const clientIdInput = el("createClientId");
+  const inputClientId = String((clientIdInput && clientIdInput.value) || "").trim();
   const items = rows.map((row) => {
     const typeInput = row.querySelector('[data-field="type"]');
     const countInput = row.querySelector('[data-field="count"]');
@@ -1391,7 +1393,7 @@ const createOrder = async () => {
   for (const item of validItems) {
     const displayName = ensureDatePrefix(item.type, createdAt);
     const amount = Number((item.count * (item.unitPrice || 0)).toFixed(2));
-    const clientId = `CLI-${Math.floor(Math.random() * 90000 + 10000)}`;
+    const clientId = inputClientId || `CLI-${Math.floor(Math.random() * 90000 + 10000)}`;
 
     // Fetch media files if link is provided
     let mediaFiles = null;
