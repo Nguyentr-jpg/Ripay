@@ -221,6 +221,9 @@ main {
 .side-actions {
   display: grid;
   gap: 10px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #efe1d2;
 }
 
 .side-btn {
@@ -255,7 +258,6 @@ main {
 }
 
 .support {
-  margin-top: auto;
   background: #f8efe6;
   border-radius: 14px;
   padding: 14px;
