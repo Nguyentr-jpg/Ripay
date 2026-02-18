@@ -43,7 +43,11 @@ const state = {
     index: 0,
     zoomed: false,
   },
+  customClientIds: [],
 };
+
+const ADD_NEW_CLIENT_ID_OPTION = "+ Add new client id";
+let activeClientIdInput = null;
 
 const el = (id) => document.getElementById(id);
 let paypalSdkPromise = null;
@@ -202,6 +206,10 @@ const formatLedgerDate = (value) => {
 
 const getClientIdOptions = () => {
   const ids = new Set();
+  (state.customClientIds || []).forEach((id) => {
+    const value = String(id || "").trim();
+    if (value) ids.add(value);
+  });
   (state.orders || []).forEach((order) => {
     const value = String((order && order.clientId) || "").trim();
     if (value) ids.add(value);
@@ -213,7 +221,47 @@ const renderClientIdOptions = () => {
   const list = el("clientIdOptions");
   if (!list) return;
   const options = getClientIdOptions();
-  list.innerHTML = options.map((id) => `<option value="${id}"></option>`).join("");
+  const optionHtml = options.map((id) => `<option value="${id}"></option>`).join("");
+  list.innerHTML = `${optionHtml}<option value="${ADD_NEW_CLIENT_ID_OPTION}"></option>`;
+};
+
+const rememberClientId = (value) => {
+  const id = String(value || "").trim();
+  if (!id || id === ADD_NEW_CLIENT_ID_OPTION) return;
+  if (!Array.isArray(state.customClientIds)) state.customClientIds = [];
+  if (!state.customClientIds.includes(id)) {
+    state.customClientIds.push(id);
+  }
+};
+
+const closeClientIdModal = () => {
+  el("clientIdModal").classList.add("hidden");
+};
+
+const openClientIdModal = (targetInput) => {
+  activeClientIdInput = targetInput || null;
+  const input = el("newClientIdInput");
+  input.value = "";
+  el("clientIdModal").classList.remove("hidden");
+  input.focus();
+};
+
+const saveNewClientId = () => {
+  const value = String((el("newClientIdInput").value || "")).trim();
+  if (!value) {
+    alert("Please enter client ID.");
+    return;
+  }
+  if (value === ADD_NEW_CLIENT_ID_OPTION) {
+    alert("Please choose another client ID.");
+    return;
+  }
+  rememberClientId(value);
+  renderClientIdOptions();
+  if (activeClientIdInput) {
+    activeClientIdInput.value = value;
+  }
+  closeClientIdModal();
 };
 
 const renderStats = () => {
@@ -382,6 +430,24 @@ const addLineItem = (item = { type: "", count: 0, link: "", unitPrice: 0, client
   row.querySelector("[data-remove]").addEventListener("click", () => {
     row.remove();
   });
+
+  const clientIdInput = row.querySelector('[data-field="clientId"]');
+  const handleClientIdInput = () => {
+    const value = String((clientIdInput && clientIdInput.value) || "").trim();
+    if (value === ADD_NEW_CLIENT_ID_OPTION) {
+      clientIdInput.value = "";
+      openClientIdModal(clientIdInput);
+    }
+  };
+  const handleClientIdChange = () => {
+    const value = String((clientIdInput && clientIdInput.value) || "").trim();
+    if (value) {
+      rememberClientId(value);
+      renderClientIdOptions();
+    }
+  };
+  clientIdInput.addEventListener("input", handleClientIdInput);
+  clientIdInput.addEventListener("change", handleClientIdChange);
 
   container.appendChild(row);
 };
@@ -1534,6 +1600,7 @@ const applyAuthenticatedSession = async (data) => {
   state.orders = [];
   state.payments = [];
   state.leafBalance = 0;
+  state.customClientIds = [];
   state.referral = { stats: { total: 0, pending: 0, rewarded: 0 }, invites: [] };
   localStorage.removeItem(STORAGE_KEY);
 
@@ -1636,6 +1703,7 @@ const setupEvents = () => {
     state.orders = [];
     state.payments = [];
     state.leafBalance = 0;
+    state.customClientIds = [];
     state.subscribed = false;
     state.planTier = "free";
     state.planFeatures = null;
@@ -1799,6 +1867,23 @@ const setupEvents = () => {
 
   el("btnCloseRefer").addEventListener("click", () => {
     el("referModal").classList.add("hidden");
+  });
+
+  el("btnCloseClientIdModal").addEventListener("click", closeClientIdModal);
+  el("btnSaveClientId").addEventListener("click", saveNewClientId);
+  el("clientIdModal").addEventListener("click", (event) => {
+    if (event.target.id === "clientIdModal") {
+      closeClientIdModal();
+    }
+  });
+  el("newClientIdInput").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveNewClientId();
+    }
+    if (event.key === "Escape") {
+      closeClientIdModal();
+    }
   });
 
   el("btnSendInvite").addEventListener("click", async () => {
@@ -2048,6 +2133,7 @@ const restoreSession = () => {
       state.orders = [];
       state.payments = [];
       state.leafBalance = 0;
+      state.customClientIds = [];
 
       state.user = user;
       showApp(user);
