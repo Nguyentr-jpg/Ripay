@@ -274,10 +274,6 @@ const renderStats = () => {
 
   row.innerHTML = `
     <div class="stat-card">
-      <div class="stat-label">Current plan</div>
-      <div class="stat-value">${getPlanLabel(state.planTier)}</div>
-    </div>
-    <div class="stat-card">
       <div class="stat-label">Total orders</div>
       <div class="stat-value">${total}</div>
     </div>
