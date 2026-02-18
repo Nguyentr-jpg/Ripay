@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260212-4" />
+    <link rel="stylesheet" href="styles.css?v=20260218-1" />
   </head>
   <body>
     <div id="app">
@@ -43,7 +43,7 @@
                   <input id="loginEmail" type="email" placeholder="name@email.com" />
                 </label>
                 <button id="btnLogin" class="btn primary">Send sign-in link</button>
-                <div class="hint">Subscription required to create orders.</div>
+                <div class="hint">Free plan: 2 orders/day and up to 10 orders/week.</div>
               </div>
             </div>
             <div class="hero-right">
@@ -85,6 +85,10 @@
                 <button class="nav-item" data-tab="create">Create Order</button>
                 <button class="nav-item" data-tab="payments">Payments</button>
               </nav>
+              <div class="side-actions">
+                <button id="btnOpenRefer" class="btn ghost side-btn">Refer and earn</button>
+                <button id="btnOpenUpgrade" class="btn side-upgrade-btn">Upgrade</button>
+              </div>
               <div class="support">
                 <div class="support-title">Feedback</div>
                 <div class="support-text">Share a quick note or request.</div>
@@ -257,29 +261,70 @@
       <div class="modal-content">
         <div class="modal-head">
           <div>
-            <h3>Subscription required</h3>
-            <div class="modal-sub">Choose a plan to create and manage orders.</div>
+            <h3>Upgrade plan</h3>
+            <div class="modal-sub">Choose Free, Personal, or Business for your workspace.</div>
           </div>
           <button id="btnCloseSub" class="btn ghost">Close</button>
         </div>
-        <div class="plan-grid">
-          <button class="plan-card active" data-plan="monthly">
-            <div class="plan-title">Monthly</div>
+        <div class="upgrade-cycle">
+          <button class="cycle-btn active" data-cycle="monthly">Monthly billing</button>
+          <button class="cycle-btn" data-cycle="annual">Annual billing</button>
+        </div>
+        <div class="plan-grid upgrade-plan-grid">
+          <button class="plan-card upgrade-plan-card active" data-tier="free">
+            <div class="plan-title">Free</div>
+            <div class="plan-price">$0 / month</div>
+            <div class="plan-note">2 orders/day, max 10 orders/week</div>
+            <ul class="plan-list">
+              <li>Storage: 12 hours</li>
+              <li>1 account</li>
+            </ul>
+          </button>
+          <button class="plan-card upgrade-plan-card" data-tier="personal">
+            <div class="plan-title">Personal</div>
             <div class="plan-price">$39 / month</div>
             <div class="plan-note">Unlimited orders</div>
+            <ul class="plan-list">
+              <li>Order email notifications</li>
+              <li>Storage: 7 days</li>
+              <li>1 account</li>
+            </ul>
           </button>
-          <button class="plan-card" data-plan="annual">
-            <div class="plan-title">Annual</div>
-            <div class="plan-price">$390 / year</div>
-            <div class="plan-note">2 months free</div>
+          <button class="plan-card upgrade-plan-card" data-tier="business">
+            <div class="plan-title">Business</div>
+            <div class="plan-price">$99 / month</div>
+            <div class="plan-note">Unlimited orders</div>
+            <ul class="plan-list">
+              <li>Order email notifications</li>
+              <li>Storage: 2 months</li>
+              <li>3 accounts included</li>
+            </ul>
           </button>
         </div>
-        <div class="hint">Auto-renew subscription via PayPal.</div>
+        <div id="upgradeHint" class="hint">Auto-renew paid plan via PayPal.</div>
         <div id="paypalSubContainer" class="paypal-topup-box"></div>
         <div id="paypalSubHint" class="hint"></div>
-        <div class="modal-actions">
-          <button id="btnStartSub" class="btn primary hidden">Start subscription</button>
+      </div>
+    </div>
+
+    <div id="referModal" class="modal hidden">
+      <div class="modal-content refer-modal-content">
+        <div class="modal-head">
+          <div>
+            <h3>Refer and earn</h3>
+            <div class="modal-sub">Invite by email. Once they subscribe, both receive 1 free month.</div>
+          </div>
+          <button id="btnCloseRefer" class="btn ghost">Close</button>
         </div>
+        <div class="refer-grid">
+          <label class="field">
+            <span>Invite email</span>
+            <input id="referInviteEmail" type="email" placeholder="friend@email.com" />
+          </label>
+          <button id="btnSendInvite" class="btn primary">Send invite</button>
+        </div>
+        <div id="referStats" class="stats-row refer-stats"></div>
+        <div id="referList" class="refer-list"></div>
       </div>
     </div>
 
@@ -314,6 +359,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=20260212-8"></script>
+    <script src="app.js?v=20260218-1"></script>
   </body>
 </html>

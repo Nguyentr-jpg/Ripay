@@ -218,6 +218,27 @@ main {
   gap: 10px;
 }
 
+.side-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.side-btn {
+  width: 100%;
+  text-align: left;
+}
+
+.side-upgrade-btn {
+  width: 100%;
+  border: 1px solid #d8ad2f;
+  background: #f0c341;
+  color: #2b2418;
+}
+
+.side-upgrade-btn:hover {
+  background: #e3b739;
+}
+
 .nav-item {
   background: transparent;
   border: 1px solid transparent;
@@ -431,6 +452,16 @@ main {
 .btn.ghost {
   background: #f7efe7;
   border: 1px solid var(--border);
+}
+
+.btn.side-upgrade-btn {
+  border: 1px solid #d8ad2f;
+  background: #f0c341;
+  color: #2b2418;
+}
+
+.btn.side-upgrade-btn:hover {
+  background: #e3b739;
 }
 
 .hint {
@@ -711,6 +742,10 @@ main {
   gap: 12px;
 }
 
+.upgrade-plan-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
 .plan-card {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -723,6 +758,34 @@ main {
 .plan-card.active {
   background: var(--accent);
   border-color: var(--border);
+}
+
+.upgrade-cycle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cycle-btn {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff7ef;
+  padding: 8px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cycle-btn.active {
+  background: var(--accent);
+}
+
+.plan-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .plan-title {
@@ -744,6 +807,51 @@ main {
   display: grid;
   gap: 12px;
   margin-top: 12px;
+}
+
+.refer-modal-content {
+  max-width: 780px;
+}
+
+.refer-grid {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 10px;
+  align-items: end;
+}
+
+.refer-stats {
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.refer-list {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fffdfb;
+  min-height: 120px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.refer-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1.5fr 100px 160px;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.refer-empty {
+  padding: 12px 8px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .modal-actions {
@@ -867,6 +975,13 @@ main {
   }
   .sidebar {
     min-height: auto;
+  }
+  .refer-grid {
+    grid-template-columns: 1fr;
+  }
+  .refer-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
   .order-row {
     grid-template-columns: 30px 1fr 1fr;

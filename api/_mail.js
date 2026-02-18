@@ -459,7 +459,87 @@ async function sendOrderPaidEmail({
   });
 }
 
+async function sendReferralInviteEmail({ toEmail, toName, referrerName, inviteUrl }) {
+  const normalizedEmail = normalizeEmail(toEmail);
+  if (!normalizedEmail) {
+    return { sent: false, skipped: true, reason: "recipient email missing" };
+  }
+
+  const recipientName = String(toName || "").trim() || normalizedEmail.split("@")[0];
+  const senderName = String(referrerName || "A Renpay user").trim();
+  const safeRecipient = escapeHtml(recipientName);
+  const safeSender = escapeHtml(senderName);
+  const safeInviteUrl = escapeHtml(inviteUrl || process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app");
+
+  const subject = `${senderName} invited you to Renpay`;
+  const textContent = [
+    `Hi ${recipientName},`,
+    "",
+    `${senderName} invited you to Renpay.`,
+    "When you subscribe, both of you receive 1 free month.",
+    "",
+    `Start here: ${inviteUrl || process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app"}`,
+  ].join("\n");
+
+  const htmlContent = `<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#111827;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 20px 8px;font-size:24px;font-weight:700;">Renpay</td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 12px;font-size:16px;line-height:1.6;">
+                Hi <strong>${safeRecipient}</strong>, <strong>${safeSender}</strong> invited you to Renpay.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 16px;font-size:14px;line-height:1.6;color:#4b5563;">
+                After you activate a subscription, both of you receive <strong>1 free month</strong>.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 20px;">
+                <a href="${safeInviteUrl}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;">Open Renpay</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  if (shouldUseSmtp()) {
+    return sendSmtpEmail({
+      toEmail: normalizedEmail,
+      toName: recipientName,
+      subject,
+      textContent,
+      htmlContent,
+    });
+  }
+
+  const sender = getBrevoSender();
+  if (!sender) {
+    return { sent: false, skipped: true, reason: "BREVO_SENDER_EMAIL missing" };
+  }
+
+  return sendBrevoEmail({
+    sender,
+    to: [{ email: normalizedEmail, name: recipientName }],
+    subject,
+    textContent,
+    htmlContent,
+    tags: ["referral_invite"],
+  });
+}
+
 module.exports = {
   sendMagicLinkEmail,
   sendOrderPaidEmail,
+  sendReferralInviteEmail,
 };

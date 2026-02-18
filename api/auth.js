@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const crypto = require("crypto");
 const { sendMagicLinkEmail } = require("./_mail");
+const { getPlanFeatures, getTierFromPlan, getTierRank } = require("./_plans");
 
 let prisma;
 
@@ -19,6 +20,12 @@ function getPrisma() {
 
 function getErrorHint(error) {
   if (!error) return "Unknown authentication error.";
+  if (error.code === "EAUTH") {
+    return "SMTP authentication failed. Check SMTP_USER and SMTP_PASS (Google App Password, no spaces).";
+  }
+  if (error.code === "ETIMEDOUT" || error.code === "ESOCKET") {
+    return "Cannot connect to SMTP server. Check SMTP_HOST/SMTP_PORT/SMTP_SECURE.";
+  }
   if (error.code === "P2021") {
     return "Subscriptions table is missing. Run 'npx prisma db push' against production database.";
   }
@@ -117,17 +124,18 @@ function verifyMagicToken(token, secret) {
 }
 
 async function getActiveSubscriptionOrNull(db, userId) {
-  let subscription = null;
+  let subscriptions = [];
   let warning = null;
 
   try {
-    subscription = await db.subscription.findFirst({
+    subscriptions = await db.subscription.findMany({
       where: {
         userId,
         status: "active",
-        expiresAt: { gt: new Date() },
+        startedAt: { lte: new Date() },
+        OR: [{ expiresAt: { gt: new Date() } }, { gateway: "PAYPAL" }],
       },
-      orderBy: { expiresAt: "desc" },
+      orderBy: [{ expiresAt: "desc" }, { createdAt: "desc" }],
     });
   } catch (subscriptionError) {
     if (subscriptionError.code === "P2021" || subscriptionError.code === "P2022") {
@@ -138,10 +146,37 @@ async function getActiveSubscriptionOrNull(db, userId) {
     }
   }
 
-  return { subscription, warning };
+  let tier = "free";
+  let selected = null;
+  for (const subscription of subscriptions) {
+    const nextTier = getTierFromPlan(subscription.plan);
+    if (!selected) {
+      selected = subscription;
+      tier = nextTier;
+      continue;
+    }
+    if (getTierRank(nextTier) > getTierRank(tier)) {
+      tier = nextTier;
+      selected = subscription;
+      continue;
+    }
+    if (
+      getTierRank(nextTier) === getTierRank(tier) &&
+      new Date(subscription.expiresAt).getTime() > new Date(selected.expiresAt).getTime()
+    ) {
+      selected = subscription;
+    }
+  }
+
+  return {
+    subscription: selected,
+    tier,
+    planFeatures: getPlanFeatures(tier),
+    warning,
+  };
 }
 
-async function findOrCreateUserByEmail(db, normalizedEmail) {
+async function findOrCreateUserByEmailWithFlag(db, normalizedEmail, allowCreate) {
   let user = await db.user.findUnique({
     where: { email: normalizedEmail },
     select: {
@@ -155,7 +190,7 @@ async function findOrCreateUserByEmail(db, normalizedEmail) {
   });
 
   if (!user) {
-    if (!envFlag(process.env.AUTH_AUTO_SIGNUP)) return null;
+    if (!allowCreate && !envFlag(process.env.AUTH_AUTO_SIGNUP)) return null;
     user = await db.user.create({
       data: {
         email: normalizedEmail,
@@ -174,6 +209,24 @@ async function findOrCreateUserByEmail(db, normalizedEmail) {
   }
 
   return user;
+}
+
+async function isInvitedEmail(db, normalizedEmail) {
+  try {
+    const invite = await db.referralInvite.findFirst({
+      where: {
+        inviteeEmail: normalizedEmail,
+        status: { in: ["PENDING", "REGISTERED"] },
+      },
+      select: { id: true },
+    });
+    return Boolean(invite);
+  } catch (error) {
+    if (error.code === "P2021" || error.code === "P2022") {
+      return false;
+    }
+    throw error;
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -211,7 +264,8 @@ module.exports = async function handler(req, res) {
       }
 
       const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
-      if (!existing && !envFlag(process.env.AUTH_AUTO_SIGNUP)) {
+      const invited = await isInvitedEmail(db, normalizedEmail);
+      if (!existing && !invited && !envFlag(process.env.AUTH_AUTO_SIGNUP)) {
         return res.status(401).json({
           error: "Account not found. Please contact admin to create your account.",
           code: "ACCOUNT_NOT_FOUND",
@@ -291,7 +345,8 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      const user = await findOrCreateUserByEmail(db, verifiedEmail);
+      const invited = await isInvitedEmail(db, verifiedEmail);
+      const user = await findOrCreateUserByEmailWithFlag(db, verifiedEmail, invited);
       if (!user) {
         return res.status(401).json({
           error: "Account not found. Please contact admin to create your account.",
@@ -307,7 +362,7 @@ module.exports = async function handler(req, res) {
         user.emailVerifiedAt = new Date();
       }
 
-      const { subscription, warning } = await getActiveSubscriptionOrNull(db, user.id);
+      const { subscription, tier, planFeatures, warning } = await getActiveSubscriptionOrNull(db, user.id);
       return res.status(200).json({
         success: true,
         user: {
@@ -325,6 +380,8 @@ module.exports = async function handler(req, res) {
               expiresAt: subscription.expiresAt,
             }
           : null,
+        tier,
+        planFeatures,
         warning,
       });
     }

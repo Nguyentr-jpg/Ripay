@@ -5,6 +5,12 @@ const SESSION_KEY = "renpay-session-v2";
 const state = {
   user: null, // { id, email, name, role }
   subscribed: false,
+  planTier: "free",
+  planFeatures: null,
+  usage: {
+    ordersToday: 0,
+    ordersThisWeek: 0,
+  },
   orders: [],
   payments: [],
   leafBalance: 0,
@@ -13,6 +19,14 @@ const state = {
   paypalPlans: {
     monthly: "",
     annual: "",
+    personal: {
+      monthly: "",
+      annual: "",
+    },
+    business: {
+      monthly: "",
+      annual: "",
+    },
   },
   paypalSdkLoaded: false,
   paypalSubSdkLoaded: false,
@@ -20,6 +34,10 @@ const state = {
   selectedOrders: new Set(),
   activeOrderId: null,
   payQueue: [],
+  referral: {
+    stats: { total: 0, pending: 0, rewarded: 0 },
+    invites: [],
+  },
   lightbox: {
     items: [],
     index: 0,
@@ -98,6 +116,7 @@ const loadState = () => {
     state.orders = data.orders || [];
     state.payments = data.payments || [];
     state.subscribed = Boolean(data.subscribed);
+    state.planTier = data.planTier || "free";
     state.leafBalance = Number(data.leafBalance || 0);
   } catch (err) {
     console.error(err);
@@ -123,6 +142,7 @@ const saveState = () => {
     orders: compactOrders,
     payments: state.payments,
     subscribed: state.subscribed,
+    planTier: state.planTier,
     leafBalance: state.leafBalance,
   };
 
@@ -152,6 +172,27 @@ const formatStatus = (status) => {
 };
 
 const formatMoney = (amount) => `$${Number(amount || 0).toFixed(2)}`;
+const getPlanLabel = (tier) => {
+  if (tier === "business") return "Business";
+  if (tier === "personal") return "Personal";
+  return "Free";
+};
+
+const formatRetention = (hours) => {
+  const value = Number(hours || 0);
+  if (value <= 0) return "-";
+  if (value % (24 * 30) === 0) return `${value / (24 * 30)} month`;
+  if (value % 24 === 0) return `${value / 24} day`;
+  return `${value} hour`;
+};
+
+const updatePlanBadge = () => {
+  const roleEl = el("sellerRole");
+  if (!roleEl) return;
+  const planLabel = getPlanLabel(state.planTier);
+  roleEl.textContent = `${planLabel} plan`;
+};
+
 const formatLedgerDate = (value) => {
   if (!value) return "";
   const date = new Date(value);
@@ -168,6 +209,10 @@ const renderStats = () => {
   const pending = unpaid.reduce((sum, o) => sum + getOrderAmount(o), 0);
 
   row.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Current plan</div>
+      <div class="stat-value">${getPlanLabel(state.planTier)}</div>
+    </div>
     <div class="stat-card">
       <div class="stat-label">Total orders</div>
       <div class="stat-value">${total}</div>
@@ -726,9 +771,75 @@ const fetchSubscriptionStatus = async () => {
       return;
     }
     state.subscribed = Boolean(data.subscription);
+    state.planTier = data.tier || (data.subscription ? "personal" : "free");
+    state.planFeatures = data.planFeatures || null;
+    state.usage = data.usage || { ordersToday: 0, ordersThisWeek: 0 };
+    updatePlanBadge();
     saveState();
+    renderStats();
   } catch (err) {
     console.error("Could not fetch subscription status:", err);
+  }
+};
+
+const renderReferralStats = () => {
+  const statsEl = el("referStats");
+  if (!statsEl) return;
+  const stats = state.referral.stats || { total: 0, pending: 0, rewarded: 0 };
+  statsEl.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total invites</div>
+      <div class="stat-value">${Number(stats.total || 0)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending</div>
+      <div class="stat-value">${Number(stats.pending || 0)}</div>
+    </div>
+    <div class="stat-card highlight">
+      <div class="stat-label">Rewarded</div>
+      <div class="stat-value">${Number(stats.rewarded || 0)}</div>
+    </div>
+  `;
+};
+
+const renderReferralList = () => {
+  const listEl = el("referList");
+  if (!listEl) return;
+  const invites = Array.isArray(state.referral.invites) ? state.referral.invites : [];
+  if (!invites.length) {
+    listEl.innerHTML = `<div class="refer-empty">No invites yet.</div>`;
+    return;
+  }
+  listEl.innerHTML = invites
+    .map((invite) => {
+      const created = formatLedgerDate(invite.createdAt);
+      return `
+        <div class="refer-row">
+          <div>${invite.inviteeEmail || "-"}</div>
+          <div>${invite.status || "-"}</div>
+          <div>${created}</div>
+        </div>
+      `;
+    })
+    .join("");
+};
+
+const fetchReferralData = async () => {
+  const email = state.user && state.user.email;
+  if (!email) return;
+  try {
+    const response = await fetch(`/api/referrals?email=${encodeURIComponent(email)}`);
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      console.error("Referral API error:", data);
+      return;
+    }
+    state.referral.stats = data.stats || { total: 0, pending: 0, rewarded: 0 };
+    state.referral.invites = Array.isArray(data.invites) ? data.invites : [];
+    renderReferralStats();
+    renderReferralList();
+  } catch (err) {
+    console.error("Could not fetch referral data:", err);
   }
 };
 
@@ -747,9 +858,19 @@ const fetchPayPalConfig = async () => {
   }
 
   state.paypalClientId = data.clientId;
+  const personalPlans = data.plans && data.plans.personal ? data.plans.personal : {};
+  const businessPlans = data.plans && data.plans.business ? data.plans.business : {};
   state.paypalPlans = {
-    monthly: (data.plans && data.plans.monthly) || "",
-    annual: (data.plans && data.plans.annual) || "",
+    monthly: (data.plans && data.plans.monthly) || personalPlans.monthly || "",
+    annual: (data.plans && data.plans.annual) || personalPlans.annual || "",
+    personal: {
+      monthly: personalPlans.monthly || (data.plans && data.plans.monthly) || "",
+      annual: personalPlans.annual || (data.plans && data.plans.annual) || "",
+    },
+    business: {
+      monthly: businessPlans.monthly || "",
+      annual: businessPlans.annual || "",
+    },
   };
   return {
     clientId: state.paypalClientId,
@@ -835,22 +956,66 @@ const closeSubscriptionModal = () => {
   el("subModal").classList.add("hidden");
 };
 
-const getSelectedPlan = () => {
-  const activePlan = document.querySelector(".plan-card.active");
-  return activePlan ? activePlan.dataset.plan : "monthly";
+const getSelectedUpgradeTier = () => {
+  const activePlan = document.querySelector(".upgrade-plan-card.active");
+  return activePlan ? activePlan.dataset.tier : "free";
+};
+
+const getSelectedBillingCycle = () => {
+  const activeCycle = document.querySelector(".cycle-btn.active");
+  return activeCycle ? activeCycle.dataset.cycle : "monthly";
+};
+
+const updateUpgradePricing = () => {
+  const cycle = getSelectedBillingCycle();
+  const personal = document.querySelector('.upgrade-plan-card[data-tier="personal"] .plan-price');
+  const business = document.querySelector('.upgrade-plan-card[data-tier="business"] .plan-price');
+  if (personal) {
+    personal.textContent = cycle === "annual" ? "$390 / year" : "$39 / month";
+  }
+  if (business) {
+    business.textContent = cycle === "annual" ? "$990 / year" : "$99 / month";
+  }
 };
 
 const renderPayPalSubscriptionButton = async () => {
   const container = el("paypalSubContainer");
   const hint = el("paypalSubHint");
   const email = state.user && state.user.email;
-  const plan = getSelectedPlan();
+  const tier = getSelectedUpgradeTier();
+  const billingCycle = getSelectedBillingCycle();
+  const planLabel = `${tier}_${billingCycle}`;
+  const upgradeHint = el("upgradeHint");
+  if (upgradeHint) {
+    if (tier === "business") {
+      upgradeHint.textContent =
+        "Business includes unlimited orders, email notifications, 2-month retention, and 3 seats.";
+    } else if (tier === "personal") {
+      upgradeHint.textContent =
+        "Personal includes unlimited orders, email notifications, 7-day retention, and 1 seat.";
+    } else {
+      const todayUsed = Number((state.usage && state.usage.ordersToday) || 0);
+      const weekUsed = Number((state.usage && state.usage.ordersThisWeek) || 0);
+      upgradeHint.textContent = `Free plan: 2 orders/day, 10 orders/week, 12-hour retention. Usage: ${todayUsed}/2 today, ${weekUsed}/10 this week.`;
+    }
+  }
 
   if (!container || !hint) return;
 
   if (!email) {
     container.innerHTML = "";
     hint.textContent = "Please sign in before starting a subscription.";
+    return;
+  }
+
+  if (tier === "free") {
+    container.innerHTML = "";
+    hint.textContent = "Free plan is active instantly. Paid checkout is not required.";
+    if (upgradeHint) {
+      upgradeHint.textContent = `Free plan limits: 2 orders/day, 10 orders/week, storage ${formatRetention(
+        12
+      )}.`;
+    }
     return;
   }
 
@@ -864,11 +1029,15 @@ const renderPayPalSubscriptionButton = async () => {
     return;
   }
 
-  const planId = state.paypalPlans[plan];
+  const planId =
+    (state.paypalPlans[tier] && state.paypalPlans[tier][billingCycle]) ||
+    (tier === "personal" ? state.paypalPlans[billingCycle] : "");
   if (!planId) {
     container.innerHTML = "";
-    hint.textContent =
-      `PayPal plan ID for '${plan}' is missing. Set PAYPAL_PLAN_ID_${plan.toUpperCase()} on server.`;
+    hint.textContent = `PayPal plan ID missing for ${tier} ${billingCycle}.`;
+    if (tier === "business") {
+      hint.textContent += " Set PAYPAL_PLAN_ID_BUSINESS_MONTHLY/ANNUAL on server.";
+    }
     return;
   }
 
@@ -887,7 +1056,7 @@ const renderPayPalSubscriptionButton = async () => {
   }
 
   container.innerHTML = "";
-  hint.textContent = `Plan: ${plan} (${planId}). Complete PayPal approval to activate.`;
+  hint.textContent = `Plan: ${planLabel} (${planId}). Complete PayPal approval to activate.`;
 
   window.paypalSub
     .Buttons({
@@ -907,7 +1076,8 @@ const renderPayPalSubscriptionButton = async () => {
           body: JSON.stringify({
             action: "activate_paypal",
             email,
-            plan,
+            tier,
+            billingCycle,
             paypalSubscriptionId: data.subscriptionID,
           }),
         });
@@ -917,10 +1087,15 @@ const renderPayPalSubscriptionButton = async () => {
         }
 
         state.subscribed = true;
+        state.planTier = tier;
         saveState();
         closeSubscriptionModal();
-        await fetchSubscriptionStatus();
-        alert("Subscription activated via PayPal.");
+        await Promise.all([fetchSubscriptionStatus(), fetchReferralData()]);
+        if (result.referralReward) {
+          alert("Subscription activated. Referral bonus applied (+1 month for both users).");
+        } else {
+          alert("Subscription activated via PayPal.");
+        }
       },
       onCancel: () => {
         hint.textContent = "Subscription checkout was cancelled.";
@@ -938,6 +1113,10 @@ const renderPayPalSubscriptionButton = async () => {
 };
 
 const openSubscriptionModal = async () => {
+  document.querySelectorAll(".upgrade-plan-card").forEach((card) => {
+    card.classList.toggle("active", card.dataset.tier === state.planTier);
+  });
+  updateUpgradePricing();
   el("subModal").classList.remove("hidden");
   await renderPayPalSubscriptionButton();
 };
@@ -1144,13 +1323,24 @@ const fetchMediaFromLink = async (link) => {
 };
 
 const createOrder = async () => {
-  if (!state.subscribed) {
-    try {
-      await openSubscriptionModal();
-    } catch (err) {
-      console.error("Could not open subscription modal:", err);
-      alert("Could not initialize PayPal subscription checkout.");
-    }
+  const features = state.planFeatures || {};
+  const usage = state.usage || { ordersToday: 0, ordersThisWeek: 0 };
+  if (
+    state.planTier === "free" &&
+    Number.isFinite(Number(features.dailyOrderLimit)) &&
+    Number(usage.ordersToday || 0) >= Number(features.dailyOrderLimit)
+  ) {
+    alert("Free plan daily limit reached (2 orders/day). Upgrade to continue.");
+    await openSubscriptionModal();
+    return;
+  }
+  if (
+    state.planTier === "free" &&
+    Number.isFinite(Number(features.weeklyOrderLimit)) &&
+    Number(usage.ordersThisWeek || 0) >= Number(features.weeklyOrderLimit)
+  ) {
+    alert("Free plan weekly limit reached (10 orders/week). Upgrade to continue.");
+    await openSubscriptionModal();
     return;
   }
 
@@ -1174,6 +1364,21 @@ const createOrder = async () => {
   if (!validItems.length) {
     alert("Please enter at least one order name and quantity.");
     return;
+  }
+
+  if (state.planTier === "free") {
+    const dailyLimit = Number((features && features.dailyOrderLimit) || 2);
+    const weeklyLimit = Number((features && features.weeklyOrderLimit) || 10);
+    const availableDaily = Math.max(0, dailyLimit - Number((usage && usage.ordersToday) || 0));
+    const availableWeekly = Math.max(0, weeklyLimit - Number((usage && usage.ordersThisWeek) || 0));
+    const available = Math.min(availableDaily, availableWeekly);
+    if (validItems.length > available) {
+      alert(
+        `Free plan remaining quota is ${available} order(s) right now. Reduce rows or upgrade plan.`
+      );
+      await openSubscriptionModal();
+      return;
+    }
   }
 
   // Disable button while saving
@@ -1235,6 +1440,17 @@ const createOrder = async () => {
           dbId: data.order.id,
         });
       } else {
+        if (response.status === 403 && data.code && String(data.code).startsWith("FREE_PLAN_")) {
+          state.planTier = data.tier || state.planTier;
+          state.planFeatures = data.planFeatures || state.planFeatures;
+          state.usage = data.usage || state.usage;
+          updatePlanBadge();
+          await openSubscriptionModal();
+          alert(data.error || "Free plan limit reached. Upgrade to continue.");
+          btnCreate.disabled = false;
+          btnCreate.textContent = "Apply";
+          return;
+        }
         console.error("API error:", data);
         alert("Could not save to database. Order saved locally and will sync when the connection is restored.");
         // Fallback to local-only order
@@ -1271,6 +1487,8 @@ const createOrder = async () => {
   }
 
   state.orders = [...newOrders, ...state.orders];
+  state.usage.ordersToday = Number(state.usage.ordersToday || 0) + newOrders.length;
+  state.usage.ordersThisWeek = Number(state.usage.ordersThisWeek || 0) + newOrders.length;
   saveState();
   renderOrders();
 
@@ -1296,16 +1514,20 @@ const applyAuthenticatedSession = async (data) => {
   state.orders = [];
   state.payments = [];
   state.leafBalance = 0;
+  state.referral = { stats: { total: 0, pending: 0, rewarded: 0 }, invites: [] };
   localStorage.removeItem(STORAGE_KEY);
 
   state.user = data.user;
   state.subscribed = Boolean(data.subscription);
+  state.planTier = data.tier || (data.subscription ? "personal" : "free");
+  state.planFeatures = data.planFeatures || null;
+  state.usage = data.usage || { ordersToday: 0, ordersThisWeek: 0 };
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
   showApp(data.user);
 
   await fetchOrdersFromDB();
   await fetchWalletFromDB();
-  await fetchSubscriptionStatus();
+  await Promise.all([fetchSubscriptionStatus(), fetchReferralData()]);
 
   return true;
 };
@@ -1378,7 +1600,7 @@ const setupEvents = () => {
       if (response.ok && data.success) {
         alert(data.message || "Sign-in link sent. Check your email inbox.");
       } else {
-        alert(data.error || "Sign in failed. Please try again.");
+        alert(data.hint ? `${data.error || "Sign in failed"}\n${data.hint}` : (data.error || "Sign in failed. Please try again."));
       }
     } catch (err) {
       console.error("Login error:", err);
@@ -1395,6 +1617,10 @@ const setupEvents = () => {
     state.payments = [];
     state.leafBalance = 0;
     state.subscribed = false;
+    state.planTier = "free";
+    state.planFeatures = null;
+    state.usage = { ordersToday: 0, ordersThisWeek: 0 };
+    state.referral = { stats: { total: 0, pending: 0, rewarded: 0 }, invites: [] };
     sessionStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(STORAGE_KEY);
     el("loginScreen").classList.remove("hidden");
@@ -1517,10 +1743,21 @@ const setupEvents = () => {
     el("feedbackModal").classList.add("hidden");
   });
 
-  document.querySelectorAll(".plan-card").forEach((card) => {
+  document.querySelectorAll(".upgrade-plan-card").forEach((card) => {
     card.addEventListener("click", async () => {
-      document.querySelectorAll(".plan-card").forEach((c) => c.classList.remove("active"));
+      document.querySelectorAll(".upgrade-plan-card").forEach((c) => c.classList.remove("active"));
       card.classList.add("active");
+      if (!el("subModal").classList.contains("hidden")) {
+        await renderPayPalSubscriptionButton();
+      }
+    });
+  });
+
+  document.querySelectorAll(".cycle-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      document.querySelectorAll(".cycle-btn").forEach((item) => item.classList.remove("active"));
+      btn.classList.add("active");
+      updateUpgradePricing();
       if (!el("subModal").classList.contains("hidden")) {
         await renderPayPalSubscriptionButton();
       }
@@ -1531,8 +1768,59 @@ const setupEvents = () => {
     closeSubscriptionModal();
   });
 
-  el("btnStartSub").addEventListener("click", async () => {
-    await renderPayPalSubscriptionButton();
+  el("btnOpenUpgrade").addEventListener("click", async () => {
+    await openSubscriptionModal();
+  });
+
+  el("btnOpenRefer").addEventListener("click", async () => {
+    el("referModal").classList.remove("hidden");
+    await fetchReferralData();
+  });
+
+  el("btnCloseRefer").addEventListener("click", () => {
+    el("referModal").classList.add("hidden");
+  });
+
+  el("btnSendInvite").addEventListener("click", async () => {
+    const inviteeEmail = (el("referInviteEmail").value || "").trim().toLowerCase();
+    if (!inviteeEmail) {
+      alert("Please enter invitee email.");
+      return;
+    }
+    if (!state.user || !state.user.email) {
+      alert("Please sign in first.");
+      return;
+    }
+
+    const btn = el("btnSendInvite");
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+
+    try {
+      const response = await fetch("/api/referrals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "invite",
+          referrerEmail: state.user.email,
+          inviteeEmail,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        alert(data.error || data.hint || "Could not send invite.");
+      } else {
+        el("referInviteEmail").value = "";
+        await fetchReferralData();
+        alert("Invite sent.");
+      }
+    } catch (err) {
+      console.error("Referral invite failed:", err);
+      alert("Could not send invite.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Send invite";
+    }
   });
 
   document.querySelectorAll(".chip").forEach((chip) => {
@@ -1638,6 +1926,13 @@ const fetchOrdersFromDB = async () => {
     const response = await fetch(url);
     const data = await response.json();
     if (data.success && Array.isArray(data.orders)) {
+      if (data.tier) {
+        state.planTier = data.tier;
+      }
+      if (data.planFeatures) {
+        state.planFeatures = data.planFeatures;
+      }
+      updatePlanBadge();
       const dbOrders = data.orders.map((o) => {
         // Find existing order in state to preserve mediaFiles
         const existingOrder = state.orders.find(existing => existing.id === o.orderNumber);
@@ -1715,7 +2010,7 @@ const fetchOrdersFromDB = async () => {
 
 const showApp = (user) => {
   el("sellerName").textContent = user.name || user.email;
-  el("sellerRole").textContent = user.role || "Account";
+  updatePlanBadge();
   el("userBadge").textContent = user.email;
   el("userBadge").classList.remove("hidden");
   el("loginScreen").classList.add("hidden");
@@ -1763,6 +2058,7 @@ const init = () => {
           fetchOrdersFromDB();
           fetchWalletFromDB();
           fetchSubscriptionStatus();
+          fetchReferralData();
         }
       }
     });
@@ -1776,6 +2072,7 @@ const init = () => {
     fetchOrdersFromDB();
     fetchWalletFromDB();
     fetchSubscriptionStatus();
+    fetchReferralData();
   }
 };
 

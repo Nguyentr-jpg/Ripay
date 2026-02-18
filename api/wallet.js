@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const { sendOrderPaidEmail } = require("./_mail");
+const { getTierFromPlan, getTierRank } = require("./_plans");
 
 let prisma;
 
@@ -67,6 +68,34 @@ async function getOrCreateWallet(tx, userId) {
     update: {},
     create: { userId, currency: "USD", balance: "0.00" },
   });
+}
+
+async function resolveUserTier(userId) {
+  let subscriptions = [];
+  try {
+    subscriptions = await getPrisma().subscription.findMany({
+      where: {
+        userId,
+        status: "active",
+        startedAt: { lte: new Date() },
+        OR: [{ expiresAt: { gt: new Date() } }, { gateway: "PAYPAL" }],
+      },
+    });
+  } catch (error) {
+    if (error.code === "P2021" || error.code === "P2022") {
+      return "free";
+    }
+    throw error;
+  }
+
+  let tier = "free";
+  for (const subscription of subscriptions) {
+    const nextTier = getTierFromPlan(subscription.plan);
+    if (getTierRank(nextTier) > getTierRank(tier)) {
+      tier = nextTier;
+    }
+  }
+  return tier;
 }
 
 module.exports = async function handler(req, res) {
@@ -352,7 +381,15 @@ async function handlePayOrders(req, res) {
   }
 
   let emailStatus = { sent: false, skipped: true, reason: "not attempted" };
-  if (Array.isArray(result.paidOrders) && result.paidOrders.length > 0 && toMoney(result.totalAmount) > 0) {
+  const userTier = await resolveUserTier(user.id);
+  const canSendOrderEmail = ["personal", "business"].includes(userTier);
+
+  if (
+    canSendOrderEmail &&
+    Array.isArray(result.paidOrders) &&
+    result.paidOrders.length > 0 &&
+    toMoney(result.totalAmount) > 0
+  ) {
     try {
       emailStatus = await sendOrderPaidEmail({
         toEmail: user.email,
@@ -370,6 +407,12 @@ async function handlePayOrders(req, res) {
         reason: emailError.message || "email_send_failed",
       };
     }
+  } else if (!canSendOrderEmail) {
+    emailStatus = {
+      sent: false,
+      skipped: true,
+      reason: "PLAN_EMAIL_NOT_INCLUDED",
+    };
   }
 
   return res.status(200).json({

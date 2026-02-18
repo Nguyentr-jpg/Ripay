@@ -66,6 +66,8 @@ model User {
   subscriptions   Subscription[]
   wallet          Wallet?
   walletLedgers   WalletLedger[]
+  referralSent    ReferralInvite[] @relation("referral_sent")
+  referralJoined  ReferralInvite[] @relation("referral_joined")
 
   @@map("users")
 }
@@ -137,6 +139,24 @@ model Subscription {
   createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("subscriptions")
+}
+
+model ReferralInvite {
+  id             String    @id @default(uuid()) @db.Uuid
+  referrerUserId String    @map("referrer_user_id") @db.Uuid
+  referrerUser   User      @relation("referral_sent", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  inviteeEmail   String    @map("invitee_email") @db.VarChar(255)
+  inviteeUserId  String?   @map("invitee_user_id") @db.Uuid
+  inviteeUser    User?     @relation("referral_joined", fields: [inviteeUserId], references: [id], onDelete: SetNull)
+  referralCode   String    @unique @map("referral_code") @db.VarChar(64)
+  status         String    @default("PENDING") @db.VarChar(32)
+  rewardedAt     DateTime? @map("rewarded_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([referrerUserId, inviteeEmail], map: "uniq_referrer_invitee")
+  @@index([inviteeEmail, status])
+  @@map("referral_invites")
 }
 
 model Payment {

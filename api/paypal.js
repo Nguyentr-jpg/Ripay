@@ -26,9 +26,26 @@ function normalizePlanId(value) {
 }
 
 function getPayPalPlanIds() {
+  const personalMonthly = normalizePlanId(
+    process.env.PAYPAL_PLAN_ID_PERSONAL_MONTHLY || process.env.PAYPAL_PLAN_ID_MONTHLY
+  );
+  const personalAnnual = normalizePlanId(
+    process.env.PAYPAL_PLAN_ID_PERSONAL_ANNUAL || process.env.PAYPAL_PLAN_ID_ANNUAL
+  );
+  const businessMonthly = normalizePlanId(process.env.PAYPAL_PLAN_ID_BUSINESS_MONTHLY);
+  const businessAnnual = normalizePlanId(process.env.PAYPAL_PLAN_ID_BUSINESS_ANNUAL);
+
   return {
-    monthly: normalizePlanId(process.env.PAYPAL_PLAN_ID_MONTHLY),
-    annual: normalizePlanId(process.env.PAYPAL_PLAN_ID_ANNUAL),
+    monthly: personalMonthly,
+    annual: personalAnnual,
+    personal: {
+      monthly: personalMonthly,
+      annual: personalAnnual,
+    },
+    business: {
+      monthly: businessMonthly,
+      annual: businessAnnual,
+    },
   };
 }
 

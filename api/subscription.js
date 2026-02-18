@@ -1,4 +1,12 @@
 const { PrismaClient } = require("@prisma/client");
+const {
+  getPlanFeatures,
+  getTierRank,
+  resolveTierFromSubscriptions,
+  getTierFromPlan,
+  getUtcDayStart,
+  getUtcWeekStart,
+} = require("./_plans");
 
 let prisma;
 
@@ -30,20 +38,36 @@ function normalizePlanId(value) {
   return raw.startsWith("P-") ? raw : `P-${raw}`;
 }
 
-function getPayPalPlanId(plan) {
-  if (plan === "monthly") return normalizePlanId(process.env.PAYPAL_PLAN_ID_MONTHLY);
-  if (plan === "annual") return normalizePlanId(process.env.PAYPAL_PLAN_ID_ANNUAL);
-  return "";
+function getPayPalPlanId(tier, billingCycle) {
+  const safeTier = String(tier || "personal").trim().toLowerCase();
+  const safeCycle = String(billingCycle || "monthly").trim().toLowerCase();
+
+  if (safeTier === "business") {
+    if (safeCycle === "annual") {
+      return normalizePlanId(process.env.PAYPAL_PLAN_ID_BUSINESS_ANNUAL);
+    }
+    return normalizePlanId(process.env.PAYPAL_PLAN_ID_BUSINESS_MONTHLY);
+  }
+
+  if (safeCycle === "annual") {
+    return normalizePlanId(process.env.PAYPAL_PLAN_ID_PERSONAL_ANNUAL || process.env.PAYPAL_PLAN_ID_ANNUAL);
+  }
+
+  return normalizePlanId(process.env.PAYPAL_PLAN_ID_PERSONAL_MONTHLY || process.env.PAYPAL_PLAN_ID_MONTHLY);
 }
 
-function addPlanInterval(date, plan) {
-  const result = new Date(date);
-  if (plan === "annual") {
-    result.setFullYear(result.getFullYear() + 1);
-  } else {
-    result.setMonth(result.getMonth() + 1);
+function addMonths(dateInput, months) {
+  const date = new Date(dateInput);
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function addPlanInterval(date, billingCycle) {
+  if (String(billingCycle).toLowerCase() === "annual") {
+    return addMonths(date, 12);
   }
-  return result;
+  return addMonths(date, 1);
 }
 
 function mapPayPalStatusToLocal(paypalStatus) {
@@ -63,15 +87,57 @@ function parseDate(dateStr, fallbackDate) {
 
 function getErrorHint(error) {
   if (error.code === "P2021") {
-    return "Subscriptions table schema is outdated. Run 'npx prisma db push' then redeploy.";
+    return "Subscriptions/referrals table schema is outdated. Run 'npx prisma db push' then redeploy.";
   }
   if (error.code === "P2022") {
-    return "Subscription columns are missing. Run 'npx prisma db push' then redeploy.";
+    return "Subscription/referral columns are missing. Run 'npx prisma db push' then redeploy.";
   }
   if (error.code === "P1001") {
     return "Cannot reach database. Check DATABASE_URL.";
   }
   return error.message || "Subscription service error.";
+}
+
+function normalizeBillingCycle(input) {
+  const value = String(input || "monthly").trim().toLowerCase();
+  return value === "annual" ? "annual" : "monthly";
+}
+
+function normalizeTier(input) {
+  const value = String(input || "personal").trim().toLowerCase();
+  if (value === "business") return "business";
+  if (value === "free") return "free";
+  return "personal";
+}
+
+function parsePlanInput(planRaw, tierRaw, billingCycleRaw) {
+  const explicitTier = normalizeTier(tierRaw);
+  const explicitBilling = normalizeBillingCycle(billingCycleRaw);
+  const plan = String(planRaw || "").trim().toLowerCase();
+
+  if (plan === "monthly" || plan === "annual") {
+    return { tier: explicitTier === "free" ? "personal" : explicitTier, billingCycle: plan };
+  }
+
+  if (plan.includes("_")) {
+    const [tierPart, cyclePart] = plan.split("_");
+    return {
+      tier: normalizeTier(tierPart),
+      billingCycle: normalizeBillingCycle(cyclePart),
+    };
+  }
+
+  if (["free", "personal", "business"].includes(plan)) {
+    return {
+      tier: normalizeTier(plan),
+      billingCycle: explicitBilling,
+    };
+  }
+
+  return {
+    tier: explicitTier,
+    billingCycle: explicitBilling,
+  };
 }
 
 async function getPayPalAccessToken() {
@@ -155,6 +221,164 @@ async function syncPayPalSubscription(subscription) {
   return updated;
 }
 
+async function getCurrentActiveSubscriptions(userId) {
+  const now = new Date();
+  return getPrisma().subscription.findMany({
+    where: {
+      userId,
+      status: "active",
+      startedAt: { lte: now },
+      OR: [{ expiresAt: { gt: now } }, { gateway: "PAYPAL" }],
+    },
+    orderBy: [{ expiresAt: "desc" }, { createdAt: "desc" }],
+  });
+}
+
+async function countOrderUsage(userId) {
+  const now = new Date();
+  const dayStart = getUtcDayStart(now);
+  const weekStart = getUtcWeekStart(now);
+
+  const [ordersToday, ordersThisWeek] = await Promise.all([
+    getPrisma().order.count({
+      where: {
+        userId,
+        createdAt: {
+          gte: dayStart,
+        },
+      },
+    }),
+    getPrisma().order.count({
+      where: {
+        userId,
+        createdAt: {
+          gte: weekStart,
+        },
+      },
+    }),
+  ]);
+
+  return { ordersToday, ordersThisWeek };
+}
+
+async function buildPlanStateForUser(userId) {
+  let subscriptions = await getCurrentActiveSubscriptions(userId);
+
+  const paypalSubs = subscriptions.filter(
+    (subscription) => subscription.gateway === "PAYPAL" && subscription.gatewaySubscriptionId
+  );
+
+  if (paypalSubs.length > 0) {
+    for (const subscription of paypalSubs) {
+      try {
+        await syncPayPalSubscription(subscription);
+      } catch (error) {
+        console.error("Could not sync PayPal subscription status:", error);
+      }
+    }
+    subscriptions = await getCurrentActiveSubscriptions(userId);
+  }
+
+  const resolved = resolveTierFromSubscriptions(subscriptions);
+  const planFeatures = getPlanFeatures(resolved.tier);
+
+  let selectedSubscription = null;
+  for (const subscription of subscriptions) {
+    if (!selectedSubscription) {
+      selectedSubscription = subscription;
+      continue;
+    }
+
+    const currentTier = getTierFromPlan(selectedSubscription.plan);
+    const nextTier = getTierFromPlan(subscription.plan);
+
+    if (getTierRank(nextTier) > getTierRank(currentTier)) {
+      selectedSubscription = subscription;
+      continue;
+    }
+
+    if (
+      getTierRank(nextTier) === getTierRank(currentTier) &&
+      new Date(subscription.expiresAt).getTime() > new Date(selectedSubscription.expiresAt).getTime()
+    ) {
+      selectedSubscription = subscription;
+    }
+  }
+
+  const usage = await countOrderUsage(userId);
+
+  return {
+    tier: resolved.tier,
+    subscription: selectedSubscription,
+    planFeatures,
+    usage,
+  };
+}
+
+async function getUserAccessEnd(tx, userId, now) {
+  const existing = await tx.subscription.findFirst({
+    where: {
+      userId,
+      status: "active",
+      expiresAt: { gt: now },
+    },
+    orderBy: { expiresAt: "desc" },
+  });
+
+  if (!existing) return now;
+  return new Date(existing.expiresAt) > now ? new Date(existing.expiresAt) : now;
+}
+
+async function createReferralBonusSubscription(tx, userId, now) {
+  const startsAt = await getUserAccessEnd(tx, userId, now);
+  const expiresAt = addMonths(startsAt, 1);
+
+  return tx.subscription.create({
+    data: {
+      userId,
+      plan: "personal_referral_bonus",
+      status: "active",
+      gateway: "REFERRAL",
+      startedAt: startsAt,
+      expiresAt,
+      nextBillingAt: expiresAt,
+    },
+  });
+}
+
+async function applyReferralReward(tx, inviteeUser, now) {
+  const invite = await tx.referralInvite.findFirst({
+    where: {
+      inviteeEmail: inviteeUser.email,
+      status: { in: ["PENDING", "REGISTERED"] },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (!invite) {
+    return null;
+  }
+
+  await createReferralBonusSubscription(tx, invite.referrerUserId, now);
+  await createReferralBonusSubscription(tx, inviteeUser.id, now);
+
+  const updatedInvite = await tx.referralInvite.update({
+    where: { id: invite.id },
+    data: {
+      inviteeUserId: inviteeUser.id,
+      status: "REWARDED",
+      rewardedAt: now,
+    },
+  });
+
+  return {
+    inviteId: updatedInvite.id,
+    referrerUserId: updatedInvite.referrerUserId,
+    inviteeUserId: updatedInvite.inviteeUserId,
+    rewardedAt: updatedInvite.rewardedAt,
+  };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -184,7 +408,6 @@ module.exports = async function handler(req, res) {
   }
 };
 
-// GET /api/subscription?email=user@example.com
 async function handleGet(req, res) {
   const email = normalizeEmail(req.query.email);
   if (!email) {
@@ -193,39 +416,27 @@ async function handleGet(req, res) {
 
   const user = await getPrisma().user.findUnique({ where: { email } });
   if (!user) {
-    return res.status(200).json({ success: true, subscription: null });
+    const freeFeatures = getPlanFeatures("free");
+    return res.status(200).json({
+      success: true,
+      subscription: null,
+      tier: "free",
+      planFeatures: freeFeatures,
+      usage: { ordersToday: 0, ordersThisWeek: 0 },
+    });
   }
 
-  const now = new Date();
-  let subscription = await getPrisma().subscription.findFirst({
-    where: {
-      userId: user.id,
-      status: "active",
-      OR: [{ expiresAt: { gt: now } }, { gateway: "PAYPAL" }],
-    },
-    orderBy: { createdAt: "desc" },
+  const planState = await buildPlanStateForUser(user.id);
+
+  return res.status(200).json({
+    success: true,
+    subscription: planState.subscription,
+    tier: planState.tier,
+    planFeatures: planState.planFeatures,
+    usage: planState.usage,
   });
-
-  if (!subscription) {
-    return res.status(200).json({ success: true, subscription: null });
-  }
-
-  if (subscription.gateway === "PAYPAL" && subscription.gatewaySubscriptionId) {
-    try {
-      subscription = await syncPayPalSubscription(subscription);
-    } catch (err) {
-      console.error("Could not sync PayPal subscription status:", err);
-    }
-  }
-
-  if (subscription.status !== "active") {
-    return res.status(200).json({ success: true, subscription: null });
-  }
-
-  return res.status(200).json({ success: true, subscription });
 }
 
-// POST /api/subscription
 async function handlePost(req, res) {
   const { action } = req.body || {};
   if (action === "activate_paypal") {
@@ -235,25 +446,33 @@ async function handlePost(req, res) {
 }
 
 async function handleActivatePayPal(req, res) {
-  const { email, plan, paypalSubscriptionId } = req.body || {};
+  const { email, plan, paypalSubscriptionId, tier, billingCycle } = req.body || {};
   const normalizedEmail = normalizeEmail(email);
 
-  if (!normalizedEmail || !plan || !paypalSubscriptionId) {
+  if (!normalizedEmail || !paypalSubscriptionId) {
     return res.status(400).json({
-      error: "Missing required fields: email, plan, paypalSubscriptionId",
+      error: "Missing required fields: email, paypalSubscriptionId",
     });
   }
 
-  if (!["monthly", "annual"].includes(plan)) {
-    return res.status(400).json({ error: "Invalid plan. Must be 'monthly' or 'annual'" });
+  const parsed = parsePlanInput(plan, tier, billingCycle);
+  if (!["personal", "business"].includes(parsed.tier)) {
+    return res.status(400).json({ error: "Invalid tier for PayPal activation." });
+  }
+
+  const configuredPlanId = getPayPalPlanId(parsed.tier, parsed.billingCycle);
+  if (!configuredPlanId) {
+    return res.status(400).json({
+      error: `PayPal plan ID missing for ${parsed.tier} ${parsed.billingCycle}.`,
+      hint: `Set PAYPAL_PLAN_ID_${parsed.tier.toUpperCase()}_${parsed.billingCycle.toUpperCase()} (or legacy PERSONAL fallback).`,
+    });
   }
 
   const user = await getOrCreateUserByEmail(normalizedEmail);
   const details = await fetchPayPalSubscription(paypalSubscriptionId);
   const localStatus = mapPayPalStatusToLocal(details.status);
 
-  const configuredPlanId = getPayPalPlanId(plan);
-  if (configuredPlanId && details.plan_id && configuredPlanId !== details.plan_id) {
+  if (details.plan_id && configuredPlanId !== details.plan_id) {
     return res.status(400).json({
       error: "PayPal plan mismatch for selected billing cycle.",
       expectedPlanId: configuredPlanId,
@@ -272,59 +491,82 @@ async function handleActivatePayPal(req, res) {
   const startedAt = parseDate(details.start_time, now);
   const nextBillingAt = parseDate(
     details.billing_info && details.billing_info.next_billing_time,
-    addPlanInterval(now, plan)
+    addPlanInterval(now, parsed.billingCycle)
   );
 
-  await getPrisma().subscription.updateMany({
-    where: {
-      userId: user.id,
-      status: "active",
-      gatewaySubscriptionId: { not: paypalSubscriptionId },
-    },
-    data: {
-      status: "canceled",
-    },
-  });
+  const planName = `${parsed.tier}_${parsed.billingCycle}`;
 
-  const subscription = await getPrisma().subscription.upsert({
-    where: { gatewaySubscriptionId: paypalSubscriptionId },
-    update: {
-      plan,
-      status: localStatus === "pending" ? "active" : localStatus,
-      gateway: "PAYPAL",
-      startedAt,
-      nextBillingAt,
-      expiresAt: nextBillingAt,
-    },
-    create: {
-      userId: user.id,
-      plan,
-      status: localStatus === "pending" ? "active" : localStatus,
-      gateway: "PAYPAL",
-      gatewaySubscriptionId: paypalSubscriptionId,
-      startedAt,
-      nextBillingAt,
-      expiresAt: nextBillingAt,
-    },
+  const result = await getPrisma().$transaction(async (tx) => {
+    await tx.subscription.updateMany({
+      where: {
+        userId: user.id,
+        status: "active",
+        gatewaySubscriptionId: { not: paypalSubscriptionId },
+      },
+      data: {
+        status: "canceled",
+      },
+    });
+
+    const subscription = await tx.subscription.upsert({
+      where: { gatewaySubscriptionId: paypalSubscriptionId },
+      update: {
+        plan: planName,
+        status: localStatus === "pending" ? "active" : localStatus,
+        gateway: "PAYPAL",
+        startedAt,
+        nextBillingAt,
+        expiresAt: nextBillingAt,
+      },
+      create: {
+        userId: user.id,
+        plan: planName,
+        status: localStatus === "pending" ? "active" : localStatus,
+        gateway: "PAYPAL",
+        gatewaySubscriptionId: paypalSubscriptionId,
+        startedAt,
+        nextBillingAt,
+        expiresAt: nextBillingAt,
+      },
+    });
+
+    let referralReward = null;
+    if (subscription.status === "active") {
+      try {
+        referralReward = await applyReferralReward(tx, user, now);
+      } catch (error) {
+        if (error.code === "P2021" || error.code === "P2022") {
+          referralReward = null;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    return { subscription, referralReward };
   });
 
   return res.status(200).json({
     success: true,
-    subscription,
+    subscription: result.subscription,
+    referralReward: result.referralReward,
     paypalStatus: details.status || null,
   });
 }
 
 async function handleCreateInternal(req, res) {
-  const { email, plan } = req.body || {};
+  const { email, plan, tier, billingCycle } = req.body || {};
   const normalizedEmail = normalizeEmail(email);
 
-  if (!normalizedEmail || !plan) {
-    return res.status(400).json({ error: "Missing required fields: email, plan" });
+  if (!normalizedEmail) {
+    return res.status(400).json({ error: "Missing required field: email" });
   }
 
-  if (!["monthly", "annual"].includes(plan)) {
-    return res.status(400).json({ error: "Invalid plan. Must be 'monthly' or 'annual'" });
+  const parsed = parsePlanInput(plan, tier, billingCycle);
+  if (!["personal", "business"].includes(parsed.tier)) {
+    return res.status(400).json({
+      error: "Invalid plan. Allowed internal plans: personal/business with monthly/annual cycle.",
+    });
   }
 
   const user = await getOrCreateUserByEmail(normalizedEmail);
@@ -333,6 +575,7 @@ async function handleCreateInternal(req, res) {
     where: {
       userId: user.id,
       status: "active",
+      startedAt: { lte: new Date() },
       expiresAt: { gt: new Date() },
     },
     orderBy: { createdAt: "desc" },
@@ -345,12 +588,12 @@ async function handleCreateInternal(req, res) {
   }
 
   const now = new Date();
-  const expiresAt = addPlanInterval(now, plan);
+  const expiresAt = addPlanInterval(now, parsed.billingCycle);
 
   const subscription = await getPrisma().subscription.create({
     data: {
       userId: user.id,
-      plan,
+      plan: `${parsed.tier}_${parsed.billingCycle}`,
       status: "active",
       gateway: "INTERNAL",
       startedAt: now,

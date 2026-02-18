@@ -1,4 +1,11 @@
 const { PrismaClient } = require("@prisma/client");
+const {
+  getPlanFeatures,
+  getTierFromPlan,
+  getTierRank,
+  getUtcDayStart,
+  getUtcWeekStart,
+} = require("./_plans");
 
 let prisma;
 
@@ -30,6 +37,63 @@ function getErrorHint(error) {
     return "Authentication failed. Check your DATABASE_URL credentials.";
   }
   return "Database connection failed. Check your Vercel environment variables.";
+}
+
+function normalizeEmail(email) {
+  if (!email || typeof email !== "string") return "";
+  return email.trim().toLowerCase();
+}
+
+async function resolveUserPlanState(userId) {
+  const now = new Date();
+  let subscriptions = [];
+  try {
+    subscriptions = await getPrisma().subscription.findMany({
+      where: {
+        userId,
+        status: "active",
+        startedAt: { lte: now },
+        OR: [{ expiresAt: { gt: now } }, { gateway: "PAYPAL" }],
+      },
+      orderBy: [{ expiresAt: "desc" }, { createdAt: "desc" }],
+    });
+  } catch (error) {
+    if (error.code !== "P2021" && error.code !== "P2022") {
+      throw error;
+    }
+  }
+
+  let tier = "free";
+  for (const subscription of subscriptions) {
+    const nextTier = getTierFromPlan(subscription.plan);
+    if (getTierRank(nextTier) > getTierRank(tier)) {
+      tier = nextTier;
+    }
+  }
+
+  const dayStart = getUtcDayStart(now);
+  const weekStart = getUtcWeekStart(now);
+
+  const [ordersToday, ordersThisWeek] = await Promise.all([
+    getPrisma().order.count({
+      where: {
+        userId,
+        createdAt: { gte: dayStart },
+      },
+    }),
+    getPrisma().order.count({
+      where: {
+        userId,
+        createdAt: { gte: weekStart },
+      },
+    }),
+  ]);
+
+  return {
+    tier,
+    planFeatures: getPlanFeatures(tier),
+    usage: { ordersToday, ordersThisWeek },
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -70,11 +134,25 @@ module.exports = async function handler(req, res) {
 };
 
 async function handleGet(req, res) {
-  const userEmail = req.query.userEmail;
+  const userEmail = normalizeEmail(req.query.userEmail);
 
   const where = {};
+  let planState = null;
+
   if (userEmail) {
-    where.user = { email: userEmail };
+    const user = await getPrisma().user.findUnique({ where: { email: userEmail } });
+    if (!user) {
+      return res.status(200).json({ success: true, orders: [] });
+    }
+    where.userId = user.id;
+
+    planState = await resolveUserPlanState(user.id);
+    const retentionHours = Number(planState.planFeatures && planState.planFeatures.retentionHours);
+    if (Number.isFinite(retentionHours) && retentionHours > 0) {
+      where.createdAt = {
+        gte: new Date(Date.now() - retentionHours * 60 * 60 * 1000),
+      };
+    }
   }
 
   const orders = await getPrisma().order.findMany({
@@ -83,7 +161,12 @@ async function handleGet(req, res) {
     orderBy: { createdAt: "desc" },
   });
 
-  return res.status(200).json({ success: true, orders });
+  return res.status(200).json({
+    success: true,
+    orders,
+    tier: planState ? planState.tier : null,
+    planFeatures: planState ? planState.planFeatures : null,
+  });
 }
 
 async function handlePost(req, res) {
@@ -107,6 +190,37 @@ async function handlePost(req, res) {
         email: userEmail,
         name: userEmail.split("@")[0],
       },
+    });
+  }
+
+  const planState = await resolveUserPlanState(user.id);
+  const features = planState.planFeatures;
+
+  if (
+    planState.tier === "free" &&
+    Number.isFinite(features.dailyOrderLimit) &&
+    planState.usage.ordersToday >= features.dailyOrderLimit
+  ) {
+    return res.status(403).json({
+      error: `Free plan limit reached: max ${features.dailyOrderLimit} orders per day.`,
+      code: "FREE_PLAN_DAILY_LIMIT",
+      tier: planState.tier,
+      usage: planState.usage,
+      planFeatures: features,
+    });
+  }
+
+  if (
+    planState.tier === "free" &&
+    Number.isFinite(features.weeklyOrderLimit) &&
+    planState.usage.ordersThisWeek >= features.weeklyOrderLimit
+  ) {
+    return res.status(403).json({
+      error: `Free plan limit reached: max ${features.weeklyOrderLimit} orders per week.`,
+      code: "FREE_PLAN_WEEKLY_LIMIT",
+      tier: planState.tier,
+      usage: planState.usage,
+      planFeatures: features,
     });
   }
 
