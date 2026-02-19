@@ -7,6 +7,7 @@ const {
   getUtcDayStart,
   getUtcWeekStart,
 } = require("./_plans");
+const { sendSubscriptionStatusEmail } = require("./_mail");
 
 let prisma;
 
@@ -138,6 +139,14 @@ function parsePlanInput(planRaw, tierRaw, billingCycleRaw) {
     tier: explicitTier,
     billingCycle: explicitBilling,
   };
+}
+
+function parsePlanForEmail(planValue) {
+  const raw = String(planValue || "").trim().toLowerCase();
+  const [tierPart, cyclePart] = raw.split("_");
+  const tier = normalizeTier(tierPart || raw);
+  const billingCycle = normalizeBillingCycle(cyclePart || "monthly");
+  return { tier, billingCycle };
 }
 
 async function getPayPalAccessToken() {
@@ -442,7 +451,62 @@ async function handlePost(req, res) {
   if (action === "activate_paypal") {
     return await handleActivatePayPal(req, res);
   }
+  if (action === "cancel_subscription") {
+    return await handleCancelSubscription(req, res);
+  }
   return await handleCreateInternal(req, res);
+}
+
+async function handleCancelSubscription(req, res) {
+  const { email } = req.body || {};
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return res.status(400).json({ error: "Missing required field: email" });
+  }
+
+  const user = await getPrisma().user.findUnique({ where: { email: normalizedEmail } });
+  if (!user) {
+    return res.status(404).json({ error: "User not found." });
+  }
+
+  const current = await getPrisma().subscription.findFirst({
+    where: {
+      userId: user.id,
+      status: "active",
+      startedAt: { lte: new Date() },
+      OR: [{ expiresAt: { gt: new Date() } }, { gateway: "PAYPAL" }],
+    },
+    orderBy: [{ expiresAt: "desc" }, { createdAt: "desc" }],
+  });
+
+  if (!current) {
+    return res.status(200).json({ success: true, canceled: null, message: "No active subscription." });
+  }
+
+  const canceled = await getPrisma().subscription.update({
+    where: { id: current.id },
+    data: {
+      status: "canceled",
+      expiresAt: new Date(),
+      nextBillingAt: null,
+    },
+  });
+
+  try {
+    const plan = parsePlanForEmail(canceled.plan);
+    await sendSubscriptionStatusEmail({
+      toEmail: user.email,
+      toName: user.name,
+      eventType: "canceled",
+      planName: canceled.plan,
+      billingCycle: plan.billingCycle,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app",
+    });
+  } catch (error) {
+    console.error("Subscription cancel email failed:", error);
+  }
+
+  return res.status(200).json({ success: true, canceled });
 }
 
 async function handleActivatePayPal(req, res) {
@@ -497,6 +561,15 @@ async function handleActivatePayPal(req, res) {
   const planName = `${parsed.tier}_${parsed.billingCycle}`;
 
   const result = await getPrisma().$transaction(async (tx) => {
+    const previousActive = await tx.subscription.findMany({
+      where: {
+        userId: user.id,
+        status: "active",
+        gatewaySubscriptionId: { not: paypalSubscriptionId },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
     await tx.subscription.updateMany({
       where: {
         userId: user.id,
@@ -543,8 +616,37 @@ async function handleActivatePayPal(req, res) {
       }
     }
 
-    return { subscription, referralReward };
+    return { subscription, referralReward, previousActive };
   });
+
+  try {
+    await sendSubscriptionStatusEmail({
+      toEmail: user.email,
+      toName: user.name,
+      eventType: "activated",
+      planName: result.subscription.plan,
+      billingCycle: parsed.billingCycle,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app",
+    });
+  } catch (error) {
+    console.error("Subscription activation email failed:", error);
+  }
+
+  for (const canceled of result.previousActive || []) {
+    try {
+      const canceledPlan = parsePlanForEmail(canceled.plan);
+      await sendSubscriptionStatusEmail({
+        toEmail: user.email,
+        toName: user.name,
+        eventType: "canceled",
+        planName: canceled.plan,
+        billingCycle: canceledPlan.billingCycle,
+        appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app",
+      });
+    } catch (error) {
+      console.error("Subscription cancellation email failed:", error);
+    }
+  }
 
   return res.status(200).json({
     success: true,
@@ -601,6 +703,19 @@ async function handleCreateInternal(req, res) {
       nextBillingAt: expiresAt,
     },
   });
+
+  try {
+    await sendSubscriptionStatusEmail({
+      toEmail: user.email,
+      toName: user.name,
+      eventType: "activated",
+      planName: subscription.plan,
+      billingCycle: parsed.billingCycle,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app",
+    });
+  } catch (error) {
+    console.error("Internal subscription activation email failed:", error);
+  }
 
   return res.status(201).json({ success: true, subscription });
 }

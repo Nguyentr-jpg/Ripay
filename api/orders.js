@@ -6,6 +6,7 @@ const {
   getUtcDayStart,
   getUtcWeekStart,
 } = require("./_plans");
+const { sendOrderCreatedEmail } = require("./_mail");
 
 let prisma;
 
@@ -42,6 +43,10 @@ function getErrorHint(error) {
 function normalizeEmail(email) {
   if (!email || typeof email !== "string") return "";
   return email.trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
 }
 
 async function resolveUserPlanState(userId) {
@@ -170,7 +175,7 @@ async function handleGet(req, res) {
 }
 
 async function handlePost(req, res) {
-  const { orderName, totalCount, totalAmount, clientId, clientName, userEmail, items } = req.body;
+  const { orderName, totalCount, totalAmount, clientId, clientName, userEmail, items, clientEmail } = req.body;
 
   if (!orderName || totalCount == null || totalAmount == null) {
     return res.status(400).json({
@@ -236,7 +241,7 @@ async function handlePost(req, res) {
       totalAmount: String(Number(totalAmount).toFixed(2)),
       status: "UNPAID",
       clientId: clientId || `CLI-${Math.floor(Math.random() * 90000 + 10000)}`,
-      clientName: clientName || userEmail,
+      clientName: clientName || clientEmail || userEmail,
       userId: user.id,
       items: items && items.length > 0
         ? {
@@ -252,6 +257,24 @@ async function handlePost(req, res) {
     },
     include: { items: true },
   });
+
+  const buyerEmail = normalizeEmail(clientEmail || clientName);
+  const canSendBuyerOrderEmail = ["personal", "business"].includes(planState.tier);
+  if (canSendBuyerOrderEmail && buyerEmail && isValidEmail(buyerEmail)) {
+    try {
+      await sendOrderCreatedEmail({
+        toEmail: buyerEmail,
+        toName: buyerEmail.split("@")[0],
+        sellerName: user.name || user.email,
+        orderNumber: order.orderNumber,
+        orderName: order.orderName,
+        totalAmount: order.totalAmount,
+        appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app",
+      });
+    } catch (error) {
+      console.error("Order created email send failed:", error);
+    }
+  }
 
   return res.status(201).json({ success: true, order });
 }

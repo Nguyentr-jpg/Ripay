@@ -1,6 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const crypto = require("crypto");
-const { sendReferralInviteEmail } = require("./_mail");
+const { sendReferralInviteEmail, sendReferralInviteSentEmail } = require("./_mail");
 
 let prisma;
 
@@ -193,6 +193,22 @@ async function handleInvite(req, res) {
     inviteUrl,
   });
 
+  let senderEmailResult = { sent: false, skipped: true, reason: "not_attempted" };
+  try {
+    senderEmailResult = await sendReferralInviteSentEmail({
+      toEmail: normalizedReferrer,
+      toName: referrer.name || normalizedReferrer.split("@")[0],
+      inviteeEmail: normalizedInvitee,
+      inviteUrl,
+    });
+  } catch (error) {
+    senderEmailResult = {
+      sent: false,
+      skipped: false,
+      reason: error.message || "sender_email_failed",
+    };
+  }
+
   return res.status(200).json({
     success: true,
     invite: {
@@ -202,6 +218,9 @@ async function handleInvite(req, res) {
       createdAt: invite.createdAt,
       referralCode: invite.referralCode,
     },
-    email: emailResult,
+    email: {
+      invitee: emailResult,
+      referrer: senderEmailResult,
+    },
   });
 }

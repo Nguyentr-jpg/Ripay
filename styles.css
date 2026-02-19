@@ -70,6 +70,108 @@ body {
   font-size: 13px;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notif-wrap {
+  position: relative;
+}
+
+.notif-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff8f2;
+  cursor: pointer;
+  position: relative;
+}
+
+.notif-btn.has-new .notif-icon {
+  display: inline-block;
+  animation: bell-ring 1.5s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.notif-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #d65f1b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+}
+
+.notif-panel {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  width: min(420px, 90vw);
+  max-height: 460px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 18px 36px rgba(38, 22, 10, 0.16);
+  z-index: 30;
+}
+
+.notif-head {
+  padding: 12px 14px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+}
+
+.notif-list {
+  display: grid;
+}
+
+.notif-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f2e8dc;
+}
+
+.notif-item:last-child {
+  border-bottom: none;
+}
+
+.notif-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.notif-msg {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.notif-time {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8b7b6d;
+}
+
+@keyframes bell-ring {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-12deg); }
+  30% { transform: rotate(10deg); }
+  40% { transform: rotate(-8deg); }
+  50% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
 main {
   padding: 12px 16px 24px;
 }
@@ -411,7 +513,7 @@ main {
 
 .line-item {
   display: grid;
-  grid-template-columns: 1.35fr 0.9fr 0.75fr 1.2fr 80px;
+  grid-template-columns: 1.25fr 0.85fr 0.75fr 1fr 1fr 80px;
   gap: 10px;
   margin-bottom: 10px;
 }
@@ -1012,6 +1114,9 @@ main {
   .line-item > input[data-field="link"] {
     grid-column: span 2;
   }
+  .line-item > input[data-field="clientEmail"] {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 700px) {
@@ -1022,7 +1127,8 @@ main {
     grid-template-columns: 1fr;
   }
   .line-item > input[data-field="type"],
-  .line-item > input[data-field="link"] {
+  .line-item > input[data-field="link"],
+  .line-item > input[data-field="clientEmail"] {
     grid-column: span 1;
   }
 }

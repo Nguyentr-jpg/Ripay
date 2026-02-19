@@ -1,4 +1,5 @@
 const STORAGE_KEY = "renpay-data-v1";
+const NOTIF_SEEN_AT_PREFIX = "renpay-notif-seen-at:";
 
 const state = {
   user: null, // { id, email, name, role }
@@ -42,6 +43,11 @@ const state = {
     zoomed: false,
   },
   customClientIds: [],
+  notifications: {
+    items: [],
+    unread: 0,
+    open: false,
+  },
 };
 
 const ADD_NEW_CLIENT_ID_OPTION = "+ Add new client id";
@@ -200,6 +206,96 @@ const formatLedgerDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
   return date.toISOString().slice(0, 10);
+};
+
+const getNotificationSeenAt = (email) => {
+  if (!email) return "";
+  return String(localStorage.getItem(`${NOTIF_SEEN_AT_PREFIX}${email}`) || "");
+};
+
+const setNotificationSeenAt = (email, value) => {
+  if (!email) return;
+  localStorage.setItem(`${NOTIF_SEEN_AT_PREFIX}${email}`, String(value || ""));
+};
+
+const formatNotifDateTime = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().replace("T", " ").slice(0, 16);
+};
+
+const renderNotifications = () => {
+  const btn = el("btnNotifications");
+  const panel = el("notifPanel");
+  const list = el("notifList");
+  const count = el("notifCount");
+  if (!btn || !panel || !list || !count) return;
+
+  const items = Array.isArray(state.notifications.items) ? state.notifications.items : [];
+  const unread = Number(state.notifications.unread || 0);
+
+  btn.classList.toggle("hidden", !state.user);
+  panel.classList.toggle("hidden", !state.notifications.open);
+  btn.classList.toggle("has-new", unread > 0);
+  count.classList.toggle("hidden", unread <= 0);
+  count.textContent = unread > 99 ? "99+" : String(unread);
+
+  if (!items.length) {
+    list.innerHTML = `<div class="notif-item"><div class="notif-msg">No notifications yet.</div></div>`;
+    return;
+  }
+
+  list.innerHTML = items
+    .map(
+      (item) => `
+      <div class="notif-item">
+        <div class="notif-title">${item.title || "Notification"}</div>
+        <div class="notif-msg">${item.message || "-"}</div>
+        <div class="notif-time">${formatNotifDateTime(item.createdAt)}</div>
+      </div>
+    `
+    )
+    .join("");
+};
+
+const markNotificationsRead = () => {
+  const email = state.user && state.user.email;
+  if (!email) return;
+  setNotificationSeenAt(email, new Date().toISOString());
+  state.notifications.unread = 0;
+  renderNotifications();
+};
+
+const toggleNotificationsPanel = () => {
+  state.notifications.open = !state.notifications.open;
+  if (state.notifications.open) {
+    markNotificationsRead();
+  }
+  renderNotifications();
+};
+
+const fetchNotificationsFromDB = async () => {
+  const email = state.user && state.user.email;
+  if (!email) return;
+  try {
+    const response = await fetch(`/api/notifications?email=${encodeURIComponent(email)}`);
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      console.error("Notifications API error:", data);
+      return;
+    }
+    state.notifications.items = Array.isArray(data.notifications) ? data.notifications : [];
+    const seenAt = getNotificationSeenAt(email);
+    const seenDate = seenAt ? new Date(seenAt) : null;
+    const seenTime = seenDate && !Number.isNaN(seenDate.getTime()) ? seenDate.getTime() : 0;
+    state.notifications.unread = state.notifications.items.filter((item) => {
+      const time = new Date(item.createdAt).getTime();
+      return Number.isFinite(time) && time > seenTime;
+    }).length;
+    renderNotifications();
+  } catch (err) {
+    console.error("Could not fetch notifications:", err);
+  }
 };
 
 const getClientIdOptions = () => {
@@ -394,7 +490,9 @@ const renderLineItems = (items = []) => {
   data.forEach((item) => addLineItem(item));
 };
 
-const addLineItem = (item = { type: "", count: 0, link: "", unitPrice: 0, clientId: "" }) => {
+const addLineItem = (
+  item = { type: "", count: 0, link: "", unitPrice: 0, clientId: "", clientEmail: "" }
+) => {
   const container = el("lineItems");
   const row = document.createElement("div");
   row.className = "line-item";
@@ -407,6 +505,7 @@ const addLineItem = (item = { type: "", count: 0, link: "", unitPrice: 0, client
       <div class="price-hint">Unit price: $<span>${Number(item.unitPrice || 0).toFixed(2)}</span></div>
     </div>
     <input data-field="clientId" type="text" list="clientIdOptions" placeholder="Client ID" value="${item.clientId || ""}" />
+    <input data-field="clientEmail" type="email" placeholder="Buyer email (optional)" value="${item.clientEmail || ""}" />
     <input data-field="link" type="text" placeholder="Link" value="${item.link}" />
     <button class="btn ghost" data-remove>–</button>
   `;
@@ -1168,7 +1267,7 @@ const renderPayPalSubscriptionButton = async () => {
         state.planTier = tier;
         saveState();
         closeSubscriptionModal();
-        await Promise.all([fetchSubscriptionStatus(), fetchReferralData()]);
+        await Promise.all([fetchSubscriptionStatus(), fetchReferralData(), fetchNotificationsFromDB()]);
         if (result.referralReward) {
           alert("Subscription activated. Referral bonus applied (+1 month for both users).");
         } else {
@@ -1354,7 +1453,7 @@ const payOrdersWithLeaf = async (orderIds) => {
       return false;
     }
 
-    await Promise.all([fetchOrdersFromDB(), fetchWalletFromDB()]);
+    await Promise.all([fetchOrdersFromDB(), fetchWalletFromDB(), fetchNotificationsFromDB()]);
     alert(`Payment successful for ${data.paidOrders.length} order(s).`);
     return true;
   } catch (err) {
@@ -1427,11 +1526,13 @@ const createOrder = async () => {
     const typeInput = row.querySelector('[data-field="type"]');
     const countInput = row.querySelector('[data-field="count"]');
     const clientIdInput = row.querySelector('[data-field="clientId"]');
+    const clientEmailInput = row.querySelector('[data-field="clientEmail"]');
     const linkInput = row.querySelector('[data-field="link"]');
     return {
       type: typeInput ? typeInput.value.trim() : "",
       count: Number((countInput && countInput.value) || 0),
       clientId: clientIdInput ? clientIdInput.value.trim() : "",
+      clientEmail: clientEmailInput ? clientEmailInput.value.trim() : "",
       link: linkInput ? linkInput.value.trim() : "",
       unitPrice: Number(row.dataset.unitPrice || 0),
     };
@@ -1491,7 +1592,8 @@ const createOrder = async () => {
           totalCount: item.count,
           totalAmount: amount,
           clientId,
-          clientName: (state.user && state.user.email) || "client@email.com",
+          clientName: item.clientEmail || (state.user && state.user.email) || "client@email.com",
+          clientEmail: item.clientEmail || "",
           userEmail: (state.user && state.user.email) || "client@email.com",
           items: [{ ...item, sourceLink: item.link }],
         }),
@@ -1544,7 +1646,7 @@ const createOrder = async () => {
           status: "unpaid",
           createdAt,
           clientId,
-          clientName: (state.user && state.user.email) || "client@email.com",
+          clientName: item.clientEmail || (state.user && state.user.email) || "client@email.com",
         });
       }
     } catch (err) {
@@ -1561,7 +1663,7 @@ const createOrder = async () => {
         status: "unpaid",
         createdAt,
         clientId,
-        clientName: (state.user && state.user.email) || "client@email.com",
+        clientName: item.clientEmail || (state.user && state.user.email) || "client@email.com",
       });
     }
   }
@@ -1571,6 +1673,7 @@ const createOrder = async () => {
   state.usage.ordersThisWeek = Number(state.usage.ordersThisWeek || 0) + newOrders.length;
   saveState();
   renderOrders();
+  fetchNotificationsFromDB();
 
   renderLineItems();
   switchTab("overview");
@@ -1595,6 +1698,7 @@ const applyAuthenticatedSession = async (data) => {
   state.payments = [];
   state.leafBalance = 0;
   state.customClientIds = [];
+  state.notifications = { items: [], unread: 0, open: false };
   state.referral = { stats: { total: 0, pending: 0, rewarded: 0 }, invites: [] };
   localStorage.removeItem(STORAGE_KEY);
 
@@ -1607,7 +1711,7 @@ const applyAuthenticatedSession = async (data) => {
 
   await fetchOrdersFromDB();
   await fetchWalletFromDB();
-  await Promise.all([fetchSubscriptionStatus(), fetchReferralData()]);
+  await Promise.all([fetchSubscriptionStatus(), fetchReferralData(), fetchNotificationsFromDB()]);
 
   return true;
 };
@@ -1627,6 +1731,11 @@ const clearClientSessionState = () => {
   el("loginScreen").classList.remove("hidden");
   el("appScreen").classList.add("hidden");
   el("userBadge").classList.add("hidden");
+  if (el("btnNotifications")) {
+    el("btnNotifications").classList.add("hidden");
+  }
+  state.notifications = { items: [], unread: 0, open: false };
+  renderNotifications();
   if (el("loginCode")) {
     el("loginCode").value = "";
   }
@@ -1786,6 +1895,20 @@ const setupEvents = () => {
       console.error("Logout API error:", err);
     }
     clearClientSessionState();
+  });
+
+  el("btnNotifications").addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleNotificationsPanel();
+  });
+
+  document.addEventListener("click", (event) => {
+    const wrap = document.querySelector(".notif-wrap");
+    if (!wrap || !state.notifications.open) return;
+    if (!wrap.contains(event.target)) {
+      state.notifications.open = false;
+      renderNotifications();
+    }
   });
 
   document.querySelectorAll(".nav-item").forEach((btn) => {
@@ -1988,7 +2111,7 @@ const setupEvents = () => {
         alert(data.error || data.hint || "Could not send invite.");
       } else {
         el("referInviteEmail").value = "";
-        await fetchReferralData();
+        await Promise.all([fetchReferralData(), fetchNotificationsFromDB()]);
         alert("Invite sent.");
       }
     } catch (err) {
@@ -2073,6 +2196,7 @@ const syncLocalOrderToDB = async (order) => {
         totalAmount: getOrderAmount(order),
         clientId: order.clientId,
         clientName: order.clientName || (state.user && state.user.email) || "client@email.com",
+        clientEmail: order.clientName || "",
         userEmail: (state.user && state.user.email) || order.clientName || "client@email.com",
         items: order.items || [],
       }),
@@ -2190,8 +2314,12 @@ const showApp = (user) => {
   updatePlanBadge();
   el("userBadge").textContent = user.email;
   el("userBadge").classList.remove("hidden");
+  if (el("btnNotifications")) {
+    el("btnNotifications").classList.remove("hidden");
+  }
   el("loginScreen").classList.add("hidden");
   el("appScreen").classList.remove("hidden");
+  renderNotifications();
 };
 
 const restoreSession = async () => {
@@ -2217,6 +2345,7 @@ const init = async () => {
   renderOrders();
   renderPayments();
   renderLineItems();
+  renderNotifications();
   setupEvents();
   setLoginChallengeActive(false);
 

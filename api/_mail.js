@@ -12,6 +12,10 @@ function normalizeEmail(email) {
   return email.trim().toLowerCase();
 }
 
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
 function envFlag(value) {
   if (typeof value !== "string") return false;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
@@ -471,6 +475,199 @@ async function sendOrderPaidEmail({
   });
 }
 
+async function sendOrderCreatedEmail({
+  toEmail,
+  toName,
+  sellerName,
+  orderNumber,
+  orderName,
+  totalAmount,
+  appUrl,
+}) {
+  const normalizedEmail = normalizeEmail(toEmail);
+  if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+    return { sent: false, skipped: true, reason: "recipient email missing or invalid" };
+  }
+
+  const recipientName = String(toName || "").trim() || normalizedEmail.split("@")[0];
+  const safeRecipient = escapeHtml(recipientName);
+  const safeSeller = escapeHtml(String(sellerName || "Seller").trim());
+  const safeOrderNumber = escapeHtml(String(orderNumber || ""));
+  const safeOrderName = escapeHtml(String(orderName || ""));
+  const safeAmount = escapeHtml(toMoney(totalAmount).toFixed(2));
+  const safeAppUrl = escapeHtml(appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app");
+
+  const subject = `New order created: ${orderNumber || "Renpay order"}`;
+  const textContent = [
+    `Hi ${recipientName},`,
+    "",
+    `${sellerName || "A seller"} created an order for you on Renpay.`,
+    `Order number: ${orderNumber || "-"}`,
+    `Order: ${orderName || "-"}`,
+    `Amount: $${toMoney(totalAmount).toFixed(2)} USD`,
+    "",
+    `Open Renpay: ${appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app"}`,
+  ].join("\n");
+
+  const htmlContent = `<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#111827;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 20px 8px;font-size:24px;font-weight:700;">Renpay</td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 12px;font-size:16px;line-height:1.6;">
+                Hi <strong>${safeRecipient}</strong>, your order has been created.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 16px;font-size:14px;line-height:1.7;color:#374151;">
+                <div><strong>Seller:</strong> ${safeSeller}</div>
+                <div><strong>Order number:</strong> ${safeOrderNumber || "-"}</div>
+                <div><strong>Order:</strong> ${safeOrderName || "-"}</div>
+                <div><strong>Total amount:</strong> $${safeAmount} USD</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 20px;">
+                <a href="${safeAppUrl}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;">Open Renpay</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  if (shouldUseSmtp()) {
+    return sendSmtpEmail({
+      toEmail: normalizedEmail,
+      toName: recipientName,
+      subject,
+      textContent,
+      htmlContent,
+    });
+  }
+
+  const sender = getBrevoSender();
+  if (!sender) {
+    return { sent: false, skipped: true, reason: "BREVO_SENDER_EMAIL missing" };
+  }
+
+  return sendBrevoEmail({
+    sender,
+    to: [{ email: normalizedEmail, name: recipientName }],
+    subject,
+    textContent,
+    htmlContent,
+    tags: ["order_created"],
+  });
+}
+
+async function sendSubscriptionStatusEmail({
+  toEmail,
+  toName,
+  eventType,
+  planName,
+  billingCycle,
+  appUrl,
+}) {
+  const normalizedEmail = normalizeEmail(toEmail);
+  if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+    return { sent: false, skipped: true, reason: "recipient email missing or invalid" };
+  }
+
+  const recipientName = String(toName || "").trim() || normalizedEmail.split("@")[0];
+  const type = String(eventType || "activated").trim().toLowerCase();
+  const isCanceled = type === "canceled";
+  const cycle = String(billingCycle || "").trim().toLowerCase();
+  const planLabel = String(planName || "plan")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+  const safeRecipient = escapeHtml(recipientName);
+  const safePlan = escapeHtml(planLabel);
+  const safeCycle = escapeHtml(cycle || "-");
+  const safeAppUrl = escapeHtml(appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app");
+
+  const subject = isCanceled
+    ? `Subscription canceled: ${planLabel}`
+    : `Subscription activated: ${planLabel}`;
+
+  const textContent = [
+    `Hi ${recipientName},`,
+    "",
+    isCanceled ? "Your subscription has been canceled." : "Your subscription is now active.",
+    `Plan: ${planLabel}`,
+    `Billing cycle: ${cycle || "-"}`,
+    "",
+    `Open Renpay: ${appUrl || process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app"}`,
+  ].join("\n");
+
+  const htmlContent = `<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#111827;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 20px 8px;font-size:24px;font-weight:700;">Renpay</td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 12px;font-size:16px;line-height:1.6;">
+                Hi <strong>${safeRecipient}</strong>, ${
+                  isCanceled ? "your subscription has been canceled." : "your subscription is active."
+                }
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 16px;font-size:14px;line-height:1.7;color:#374151;">
+                <div><strong>Plan:</strong> ${safePlan}</div>
+                <div><strong>Billing cycle:</strong> ${safeCycle}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 20px;">
+                <a href="${safeAppUrl}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;">Open Renpay</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  if (shouldUseSmtp()) {
+    return sendSmtpEmail({
+      toEmail: normalizedEmail,
+      toName: recipientName,
+      subject,
+      textContent,
+      htmlContent,
+    });
+  }
+
+  const sender = getBrevoSender();
+  if (!sender) {
+    return { sent: false, skipped: true, reason: "BREVO_SENDER_EMAIL missing" };
+  }
+
+  return sendBrevoEmail({
+    sender,
+    to: [{ email: normalizedEmail, name: recipientName }],
+    subject,
+    textContent,
+    htmlContent,
+    tags: ["subscription", isCanceled ? "subscription_canceled" : "subscription_activated"],
+  });
+}
+
 async function sendReferralInviteEmail({ toEmail, toName, referrerName, inviteUrl }) {
   const normalizedEmail = normalizeEmail(toEmail);
   if (!normalizedEmail) {
@@ -550,8 +747,90 @@ async function sendReferralInviteEmail({ toEmail, toName, referrerName, inviteUr
   });
 }
 
+async function sendReferralInviteSentEmail({ toEmail, toName, inviteeEmail, inviteUrl }) {
+  const normalizedEmail = normalizeEmail(toEmail);
+  if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+    return { sent: false, skipped: true, reason: "recipient email missing or invalid" };
+  }
+
+  const recipientName = String(toName || "").trim() || normalizedEmail.split("@")[0];
+  const safeRecipient = escapeHtml(recipientName);
+  const safeInvitee = escapeHtml(String(inviteeEmail || ""));
+  const safeInviteUrl = escapeHtml(inviteUrl || process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app");
+  const subject = "Referral invite sent";
+
+  const textContent = [
+    `Hi ${recipientName},`,
+    "",
+    `Your referral invite has been sent to ${inviteeEmail || "-"}.`,
+    "When they subscribe, both of you receive 1 free month.",
+    "",
+    `Open Renpay: ${inviteUrl || process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app"}`,
+  ].join("\n");
+
+  const htmlContent = `<!doctype html>
+<html>
+  <body style="margin:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#111827;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 20px 8px;font-size:24px;font-weight:700;">Renpay</td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 12px;font-size:16px;line-height:1.6;">
+                Hi <strong>${safeRecipient}</strong>, your referral invite was sent successfully.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 16px;font-size:14px;line-height:1.7;color:#374151;">
+                <div><strong>Invitee:</strong> ${safeInvitee || "-"}</div>
+                <div>When they subscribe, both of you receive 1 free month.</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 20px;">
+                <a href="${safeInviteUrl}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;">Open Renpay</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  if (shouldUseSmtp()) {
+    return sendSmtpEmail({
+      toEmail: normalizedEmail,
+      toName: recipientName,
+      subject,
+      textContent,
+      htmlContent,
+    });
+  }
+
+  const sender = getBrevoSender();
+  if (!sender) {
+    return { sent: false, skipped: true, reason: "BREVO_SENDER_EMAIL missing" };
+  }
+
+  return sendBrevoEmail({
+    sender,
+    to: [{ email: normalizedEmail, name: recipientName }],
+    subject,
+    textContent,
+    htmlContent,
+    tags: ["referral_invite_sender"],
+  });
+}
+
 module.exports = {
   sendMagicLinkEmail,
   sendOrderPaidEmail,
+  sendOrderCreatedEmail,
+  sendSubscriptionStatusEmail,
   sendReferralInviteEmail,
+  sendReferralInviteSentEmail,
 };
