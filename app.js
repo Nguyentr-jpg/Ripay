@@ -1,7 +1,5 @@
 const STORAGE_KEY = "renpay-data-v1";
 
-const SESSION_KEY = "renpay-session-v2";
-
 const state = {
   user: null, // { id, email, name, role }
   subscribed: false,
@@ -1605,7 +1603,6 @@ const applyAuthenticatedSession = async (data) => {
   state.planTier = data.tier || (data.subscription ? "personal" : "free");
   state.planFeatures = data.planFeatures || null;
   state.usage = data.usage || { ordersToday: 0, ordersThisWeek: 0 };
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
   showApp(data.user);
 
   await fetchOrdersFromDB();
@@ -1613,6 +1610,23 @@ const applyAuthenticatedSession = async (data) => {
   await Promise.all([fetchSubscriptionStatus(), fetchReferralData()]);
 
   return true;
+};
+
+const clearClientSessionState = () => {
+  state.user = null;
+  state.orders = [];
+  state.payments = [];
+  state.leafBalance = 0;
+  state.customClientIds = [];
+  state.subscribed = false;
+  state.planTier = "free";
+  state.planFeatures = null;
+  state.usage = { ordersToday: 0, ordersThisWeek: 0 };
+  state.referral = { stats: { total: 0, pending: 0, rewarded: 0 }, invites: [] };
+  localStorage.removeItem(STORAGE_KEY);
+  el("loginScreen").classList.remove("hidden");
+  el("appScreen").classList.add("hidden");
+  el("userBadge").classList.add("hidden");
 };
 
 const getAuthTokenFromUrl = () => {
@@ -1659,6 +1673,45 @@ const verifyMagicLinkToken = async (authToken) => {
   }
 };
 
+const verifyLoginCode = async () => {
+  const email = String((el("loginEmail").value || "")).trim();
+  const code = String((el("loginCode").value || "")).trim();
+  if (!email) {
+    alert("Please enter your email.");
+    return false;
+  }
+  if (!code) {
+    alert("Please enter the 6-digit sign-in code.");
+    return false;
+  }
+
+  const btn = el("btnLoginCode");
+  btn.disabled = true;
+  btn.textContent = "Signing in...";
+
+  try {
+    const response = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify_login_code", email, code }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success || !data.user) {
+      alert(data.error || "Sign-in code is invalid or expired.");
+      return false;
+    }
+    await applyAuthenticatedSession(data);
+    return true;
+  } catch (err) {
+    console.error("Sign-in code verification error:", err);
+    alert("Could not verify sign-in code. Please try again.");
+    return false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sign in with code";
+  }
+};
+
 const setupEvents = () => {
   el("btnLogin").addEventListener("click", async () => {
     const email = el("loginEmail").value.trim();
@@ -1681,7 +1734,10 @@ const setupEvents = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert(data.message || "Sign-in link sent. Check your email inbox.");
+        alert(
+          data.message ||
+            "Sign-in link and code sent. Check your email inbox, then paste the code here if needed."
+        );
       } else {
         alert(data.hint ? `${data.error || "Sign in failed"}\n${data.hint}` : (data.error || "Sign in failed. Please try again."));
       }
@@ -1694,22 +1750,31 @@ const setupEvents = () => {
     btn.textContent = "Send sign-in link";
   });
 
-  el("btnLogout").addEventListener("click", () => {
-    state.user = null;
-    state.orders = [];
-    state.payments = [];
-    state.leafBalance = 0;
-    state.customClientIds = [];
-    state.subscribed = false;
-    state.planTier = "free";
-    state.planFeatures = null;
-    state.usage = { ordersToday: 0, ordersThisWeek: 0 };
-    state.referral = { stats: { total: 0, pending: 0, rewarded: 0 }, invites: [] };
-    sessionStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(STORAGE_KEY);
-    el("loginScreen").classList.remove("hidden");
-    el("appScreen").classList.add("hidden");
-    el("userBadge").classList.add("hidden");
+  el("btnLoginCode").addEventListener("click", verifyLoginCode);
+  el("loginCode").addEventListener("input", (event) => {
+    const digits = String(event.target.value || "")
+      .replace(/\D/g, "")
+      .slice(0, 6);
+    event.target.value = digits;
+  });
+  el("loginCode").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      verifyLoginCode();
+    }
+  });
+
+  el("btnLogout").addEventListener("click", async () => {
+    try {
+      await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      });
+    } catch (err) {
+      console.error("Logout API error:", err);
+    }
+    clearClientSessionState();
   });
 
   document.querySelectorAll(".nav-item").forEach((btn) => {
@@ -2118,31 +2183,24 @@ const showApp = (user) => {
   el("appScreen").classList.remove("hidden");
 };
 
-const restoreSession = () => {
+const restoreSession = async () => {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) return false;
-    const user = JSON.parse(raw);
-    if (user && user.email) {
-      // Clear any stale localStorage data
-      localStorage.removeItem(STORAGE_KEY);
-      state.orders = [];
-      state.payments = [];
-      state.leafBalance = 0;
-      state.customClientIds = [];
-
-      state.user = user;
-      showApp(user);
-      return true;
-    }
+    const response = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "session" }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success || !data.user) return false;
+    await applyAuthenticatedSession(data);
+    return true;
   } catch (err) {
     console.error("Failed to restore session:", err);
-    sessionStorage.removeItem(SESSION_KEY);
+    return false;
   }
-  return false;
 };
 
-const init = () => {
+const init = async () => {
   // Don't load localStorage on init - we'll fetch from database instead
   // This prevents showing the wrong user's data
   renderOrders();
@@ -2153,29 +2211,14 @@ const init = () => {
 
   const authToken = getAuthTokenFromUrl();
   if (authToken) {
-    verifyMagicLinkToken(authToken).then((ok) => {
-      if (!ok) {
-        const hasSession = restoreSession();
-        if (hasSession) {
-          fetchOrdersFromDB();
-          fetchWalletFromDB();
-          fetchSubscriptionStatus();
-          fetchReferralData();
-        }
-      }
-    });
+    const ok = await verifyMagicLinkToken(authToken);
+    if (!ok) {
+      await restoreSession();
+    }
     return;
   }
 
-  // Restore session if user was previously logged in
-  const hasSession = restoreSession();
-  // Fetch latest data from database in background
-  if (hasSession) {
-    fetchOrdersFromDB();
-    fetchWalletFromDB();
-    fetchSubscriptionStatus();
-    fetchReferralData();
-  }
+  await restoreSession();
 };
 
 init();

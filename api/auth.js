@@ -4,6 +4,9 @@ const { sendMagicLinkEmail } = require("./_mail");
 const { getPlanFeatures, getTierFromPlan, getTierRank } = require("./_plans");
 
 let prisma;
+const SESSION_COOKIE_NAME = "renpay_session";
+const SESSION_TTL_DAYS = 14;
+const SESSION_TTL_SECONDS = SESSION_TTL_DAYS * 24 * 60 * 60;
 
 function getPrisma() {
   if (!prisma) {
@@ -71,6 +74,82 @@ function getMagicLinkTTLMinutes() {
   return Math.min(60, Math.max(5, Math.round(value)));
 }
 
+function parseCookies(req) {
+  const raw = String((req && req.headers && req.headers.cookie) || "");
+  if (!raw) return {};
+  return raw.split(";").reduce((acc, pair) => {
+    const index = pair.indexOf("=");
+    if (index <= 0) return acc;
+    const key = pair.slice(0, index).trim();
+    const value = pair.slice(index + 1).trim();
+    if (!key) return acc;
+    acc[key] = decodeURIComponent(value || "");
+    return acc;
+  }, {});
+}
+
+function shouldUseSecureCookie(req) {
+  if (String(process.env.NODE_ENV || "").toLowerCase() === "production") return true;
+  const forwardedProto = String((req && req.headers && req.headers["x-forwarded-proto"]) || "");
+  return forwardedProto.toLowerCase().includes("https");
+}
+
+function appendSetCookie(res, value) {
+  const current = res.getHeader("Set-Cookie");
+  if (!current) {
+    res.setHeader("Set-Cookie", value);
+    return;
+  }
+  if (Array.isArray(current)) {
+    res.setHeader("Set-Cookie", [...current, value]);
+    return;
+  }
+  res.setHeader("Set-Cookie", [String(current), value]);
+}
+
+function setSessionCookie(res, req, token) {
+  const attrs = [
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${SESSION_TTL_SECONDS}`,
+  ];
+  if (shouldUseSecureCookie(req)) attrs.push("Secure");
+  appendSetCookie(res, attrs.join("; "));
+}
+
+function clearSessionCookie(res, req) {
+  const attrs = [
+    `${SESSION_COOKIE_NAME}=`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=0",
+  ];
+  if (shouldUseSecureCookie(req)) attrs.push("Secure");
+  appendSetCookie(res, attrs.join("; "));
+}
+
+function normalizeSignInCode(value) {
+  return String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 6);
+}
+
+function getLoginCodeSlot({ timestamp = Date.now(), ttlMinutes = 10 }) {
+  const intervalMs = Math.max(1, Number(ttlMinutes || 10)) * 60 * 1000;
+  return Math.floor(Number(timestamp || Date.now()) / intervalMs);
+}
+
+function computeLoginCode({ email, secret, slot }) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const base = `${normalizedEmail}|${slot}|renpay-login-code-v1`;
+  const digest = crypto.createHmac("sha256", secret).update(base).digest();
+  const number = digest.readUInt32BE(0) % 1000000;
+  return String(number).padStart(6, "0");
+}
+
 function base64UrlEncode(value) {
   return Buffer.from(value, "utf8").toString("base64url");
 }
@@ -120,6 +199,28 @@ function verifyMagicToken(token, secret) {
     return { valid: false, reason: "Token expired" };
   }
 
+  return { valid: true, payload };
+}
+
+function createSessionToken({ userId, email, secret }) {
+  const now = Date.now();
+  const payload = {
+    uid: String(userId || ""),
+    email: String(email || "").trim().toLowerCase(),
+    iat: now,
+    exp: now + SESSION_TTL_SECONDS * 1000,
+    nonce: crypto.randomBytes(16).toString("hex"),
+  };
+  return signMagicToken(payload, secret);
+}
+
+function verifySessionToken(token, secret) {
+  const verifyResult = verifyMagicToken(token, secret);
+  if (!verifyResult.valid) return verifyResult;
+  const payload = verifyResult.payload || {};
+  if (!payload.uid || !payload.email) {
+    return { valid: false, reason: "Invalid session payload" };
+  }
   return { valid: true, payload };
 }
 
@@ -229,6 +330,56 @@ async function isInvitedEmail(db, normalizedEmail) {
   }
 }
 
+async function buildAuthSuccessResponse(db, verifiedEmail) {
+  const invited = await isInvitedEmail(db, verifiedEmail);
+  const user = await findOrCreateUserByEmailWithFlag(db, verifiedEmail, invited);
+  if (!user) {
+    return {
+      ok: false,
+      status: 401,
+      body: {
+        error: "Account not found. Please contact admin to create your account.",
+        code: "ACCOUNT_NOT_FOUND",
+      },
+    };
+  }
+
+  if (!user.emailVerifiedAt) {
+    await db.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date() },
+    });
+    user.emailVerifiedAt = new Date();
+  }
+
+  const { subscription, tier, planFeatures, warning } = await getActiveSubscriptionOrNull(db, user.id);
+  return {
+    ok: true,
+    status: 200,
+    body: {
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        emailVerifiedAt: user.emailVerifiedAt,
+        createdAt: user.createdAt,
+      },
+      subscription: subscription
+        ? {
+            plan: subscription.plan,
+            status: subscription.status,
+            expiresAt: subscription.expiresAt,
+          }
+        : null,
+      tier,
+      planFeatures,
+      warning,
+    },
+  };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -243,7 +394,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { action, email, token } = req.body || {};
+    const { action, email, token, code } = req.body || {};
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
     const db = getPrisma();
 
@@ -288,6 +439,11 @@ module.exports = async function handler(req, res) {
         nonce: crypto.randomBytes(16).toString("hex"),
       };
       const authToken = signMagicToken(payload, secret);
+      const signInCode = computeLoginCode({
+        email: normalizedEmail,
+        secret,
+        slot: getLoginCodeSlot({ timestamp: Date.now(), ttlMinutes }),
+      });
       const appUrl = String(process.env.NEXT_PUBLIC_APP_URL || "https://renpay.vercel.app")
         .trim()
         .replace(/\/+$/, "");
@@ -297,6 +453,7 @@ module.exports = async function handler(req, res) {
         toEmail: normalizedEmail,
         toName: existing && existing.name ? existing.name : normalizedEmail.split("@")[0],
         loginUrl,
+        signInCode,
         expiresMinutes: ttlMinutes,
       });
 
@@ -309,7 +466,7 @@ module.exports = async function handler(req, res) {
 
       return res.status(200).json({
         success: true,
-        message: "Sign-in link sent. Please check your email inbox.",
+        message: "Sign-in link and code sent. Please check your email inbox.",
       });
     }
 
@@ -345,49 +502,136 @@ module.exports = async function handler(req, res) {
         });
       }
 
-      const invited = await isInvitedEmail(db, verifiedEmail);
-      const user = await findOrCreateUserByEmailWithFlag(db, verifiedEmail, invited);
-      if (!user) {
+      const authResult = await buildAuthSuccessResponse(db, verifiedEmail);
+      if (authResult.ok && authResult.body && authResult.body.user) {
+        const sessionToken = createSessionToken({
+          userId: authResult.body.user.id,
+          email: authResult.body.user.email,
+          secret,
+        });
+        setSessionCookie(res, req, sessionToken);
+      }
+      return res.status(authResult.status).json(authResult.body);
+    }
+
+    if (action === "verify_login_code") {
+      if (!normalizedEmail) {
+        return res.status(400).json({ error: "Missing required field: email" });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        return res.status(400).json({ error: "Invalid email format" });
+      }
+      const normalizedCode = normalizeSignInCode(code);
+      if (!normalizedCode || normalizedCode.length !== 6) {
+        return res.status(400).json({ error: "Missing or invalid sign-in code" });
+      }
+
+      const secret = getMagicLinkSecret();
+      if (!secret) {
+        return res.status(500).json({
+          error: "Auth secret is not configured.",
+          code: "AUTH_SECRET_MISSING",
+        });
+      }
+
+      const allowedEmails = getAllowedEmails();
+      if (allowedEmails.size > 0 && !allowedEmails.has(normalizedEmail)) {
+        return res.status(403).json({
+          error: "This email is not allowed to sign in.",
+          code: "EMAIL_NOT_ALLOWED",
+        });
+      }
+
+      const ttlMinutes = getMagicLinkTTLMinutes();
+      const currentSlot = getLoginCodeSlot({ timestamp: Date.now(), ttlMinutes });
+      const validCodes = new Set([
+        computeLoginCode({ email: normalizedEmail, secret, slot: currentSlot }),
+        computeLoginCode({ email: normalizedEmail, secret, slot: currentSlot - 1 }),
+      ]);
+
+      if (!validCodes.has(normalizedCode)) {
         return res.status(401).json({
-          error: "Account not found. Please contact admin to create your account.",
-          code: "ACCOUNT_NOT_FOUND",
+          error: "Invalid or expired sign-in code.",
+          code: "INVALID_SIGNIN_CODE",
         });
       }
 
-      if (!user.emailVerifiedAt) {
-        await db.user.update({
-          where: { id: user.id },
-          data: { emailVerifiedAt: new Date() },
+      const authResult = await buildAuthSuccessResponse(db, normalizedEmail);
+      if (authResult.ok && authResult.body && authResult.body.user) {
+        const sessionToken = createSessionToken({
+          userId: authResult.body.user.id,
+          email: authResult.body.user.email,
+          secret,
         });
-        user.emailVerifiedAt = new Date();
+        setSessionCookie(res, req, sessionToken);
+      }
+      return res.status(authResult.status).json(authResult.body);
+    }
+
+    if (action === "session") {
+      const secret = getMagicLinkSecret();
+      if (!secret) {
+        return res.status(500).json({
+          error: "Auth secret is not configured.",
+          code: "AUTH_SECRET_MISSING",
+        });
       }
 
-      const { subscription, tier, planFeatures, warning } = await getActiveSubscriptionOrNull(db, user.id);
-      return res.status(200).json({
-        success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          emailVerifiedAt: user.emailVerifiedAt,
-          createdAt: user.createdAt,
-        },
-        subscription: subscription
-          ? {
-              plan: subscription.plan,
-              status: subscription.status,
-              expiresAt: subscription.expiresAt,
-            }
-          : null,
-        tier,
-        planFeatures,
-        warning,
+      const cookies = parseCookies(req);
+      const sessionToken = String(cookies[SESSION_COOKIE_NAME] || "");
+      if (!sessionToken) {
+        return res.status(401).json({ error: "No active session.", code: "SESSION_MISSING" });
+      }
+
+      const verifyResult = verifySessionToken(sessionToken, secret);
+      if (!verifyResult.valid) {
+        clearSessionCookie(res, req);
+        return res.status(401).json({
+          error: verifyResult.reason || "Invalid or expired session.",
+          code: "SESSION_INVALID",
+        });
+      }
+
+      const verifiedEmail = String(verifyResult.payload.email || "")
+        .trim()
+        .toLowerCase();
+      if (!verifiedEmail) {
+        clearSessionCookie(res, req);
+        return res.status(401).json({ error: "Invalid session.", code: "SESSION_INVALID" });
+      }
+
+      const allowedEmails = getAllowedEmails();
+      if (allowedEmails.size > 0 && !allowedEmails.has(verifiedEmail)) {
+        clearSessionCookie(res, req);
+        return res.status(403).json({
+          error: "This email is not allowed to sign in.",
+          code: "EMAIL_NOT_ALLOWED",
+        });
+      }
+
+      const authResult = await buildAuthSuccessResponse(db, verifiedEmail);
+      if (!authResult.ok || !authResult.body || !authResult.body.user) {
+        clearSessionCookie(res, req);
+        return res.status(authResult.status).json(authResult.body);
+      }
+
+      const refreshedSession = createSessionToken({
+        userId: authResult.body.user.id,
+        email: authResult.body.user.email,
+        secret,
       });
+      setSessionCookie(res, req, refreshedSession);
+      return res.status(200).json(authResult.body);
+    }
+
+    if (action === "logout") {
+      clearSessionCookie(res, req);
+      return res.status(200).json({ success: true });
     }
 
     return res.status(400).json({
-      error: "Invalid auth action. Use 'send_magic_link' or 'verify_magic_link'.",
+      error:
+        "Invalid auth action. Use 'send_magic_link', 'verify_magic_link', 'verify_login_code', 'session', or 'logout'.",
     });
   } catch (error) {
     console.error("Auth API Error:", error);

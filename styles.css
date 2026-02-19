@@ -114,6 +114,11 @@ main {
   max-width: 360px;
 }
 
+.login-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .preview-card {
   background: var(--card);
   padding: 20px;

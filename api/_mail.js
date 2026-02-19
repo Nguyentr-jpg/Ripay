@@ -306,7 +306,7 @@ async function sendSmtpEmail({ toEmail, toName, subject, textContent, htmlConten
   };
 }
 
-async function sendMagicLinkEmail({ toEmail, toName, loginUrl, expiresMinutes }) {
+async function sendMagicLinkEmail({ toEmail, toName, loginUrl, signInCode, expiresMinutes }) {
   const normalizedEmail = normalizeEmail(toEmail);
   if (!normalizedEmail) {
     return { sent: false, skipped: true, reason: "recipient email missing" };
@@ -315,14 +315,18 @@ async function sendMagicLinkEmail({ toEmail, toName, loginUrl, expiresMinutes })
   const recipientName = String(toName || "").trim() || normalizedEmail.split("@")[0];
   const safeName = escapeHtml(recipientName);
   const safeUrl = escapeHtml(loginUrl || "");
+  const safeCode = escapeHtml(String(signInCode || ""));
   const ttl = Number(expiresMinutes || 10);
 
-  const subject = "Your Renpay sign-in link";
+  const subject = "Your Renpay sign-in link and code";
   const textContent = [
     `Hi ${recipientName},`,
     "",
     "Use this secure link to sign in to Renpay:",
     loginUrl || "",
+    "",
+    "Or enter this sign-in code on the login screen:",
+    signInCode || "",
     "",
     `This link expires in ${ttl} minutes.`,
     "If you did not request this email, you can ignore it.",
@@ -345,6 +349,14 @@ async function sendMagicLinkEmail({ toEmail, toName, loginUrl, expiresMinutes })
             <tr>
               <td style="padding:0 20px 16px;">
                 <a href="${safeUrl}" style="display:inline-block;padding:12px 18px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;">Sign in to Renpay</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 20px 16px;font-size:14px;line-height:1.6;color:#4b5563;">
+                Or enter this sign-in code:
+                <div style="margin-top:8px;display:inline-block;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;color:#111827;font-size:20px;letter-spacing:2px;font-weight:700;">
+                  ${safeCode || "------"}
+                </div>
               </td>
             </tr>
             <tr>
