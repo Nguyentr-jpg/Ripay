@@ -52,7 +52,7 @@ const state = {
   lang: "en",
 };
 
-const ADD_NEW_CLIENT_ID_OPTION = "+ Add new client id";
+const ADD_NEW_CLIENT_ID_OPTION_FALLBACKS = ["+ Add new client id", "+ Thêm client id mới"];
 let activeClientIdInput = null;
 
 const el = (id) => document.getElementById(id);
@@ -137,6 +137,165 @@ const I18N = {
     lineItemLinkPlaceholder: "Link",
     notifNone: "No notifications yet.",
     sellerPlan: "{plan} plan",
+    addNewClientIdOption: "+ Add new client id",
+    notifDefaultTitle: "Notification",
+    galleryClose: "Close",
+    galleryDeleteOrder: "Delete order",
+    galleryPay: "Pay",
+    galleryLoadingPreviews: "Loading previews...",
+    payModalTitle: "Pay for orders",
+    payModalSub: "Leaf credits balance",
+    payMethodLabel: "Payment method",
+    payMethodValue: "Leaf credits",
+    payRateLabel: "Rate",
+    payRateValue: "1 Leaf = $1.00 USD",
+    btnTopupLeafFromPay: "Top up Leaf",
+    btnConfirmPay: "Pay with Leaf",
+    payTotalLine: "Total: {total} for {count} order(s)",
+    payBalanceLine: "Leaf balance: {balance}",
+    payNeedMore: "Need {needed} more Leaf before payment.",
+    payEnough: "Enough Leaf balance to pay now.",
+    topupTitle: "Top up Leaf",
+    topupSub: "PayPal Sandbox checkout (1 Leaf = $1 USD)",
+    leafAmountLabel: "Leaf amount",
+    topupSummaryLine: "Top-up amount: {amount} = {leaf} Leaf",
+    upgradeTitle: "Upgrade plan",
+    upgradeSub: "Choose Free, Personal, or Business for your workspace.",
+    cycleMonthly: "Monthly billing",
+    cycleAnnual: "Annual billing",
+    planFreeTitle: "Free",
+    planFreePrice: "$0 / month",
+    planFreeNote: "2 orders/day, max 10 orders/week",
+    planFreeItem1: "Storage: 12 hours",
+    planFreeItem2: "1 account",
+    planPersonalTitle: "Personal",
+    planPersonalNote: "Unlimited orders",
+    planPersonalItem1: "Order email notifications",
+    planPersonalItem2: "Storage: 7 days",
+    planPersonalItem3: "1 account",
+    planBusinessTitle: "Business",
+    planBusinessNote: "Unlimited orders",
+    planBusinessItem1: "Order email notifications",
+    planBusinessItem2: "Storage: 2 months",
+    planBusinessItem3: "3 accounts included",
+    upgradeHintAuto: "Auto-renew paid plan via PayPal.",
+    referTitle: "Refer and earn",
+    referSub: "Invite by email. Once they subscribe, both receive 1 free month.",
+    referEmailLabel: "Invite email",
+    referEmailPlaceholder: "friend@email.com",
+    btnSendInvite: "Send invite",
+    referralTotalInvites: "Total invites",
+    referralPending: "Pending",
+    referralRewarded: "Rewarded",
+    referralNoInvites: "No invites yet.",
+    referralInviteSent: "Invite sent.",
+    referralSending: "Sending...",
+    clientIdModalTitle: "Add client ID",
+    clientIdModalSub: "Create a new client ID and use it for this row.",
+    clientIdModalLabel: "Client ID",
+    newClientIdPlaceholder: "CLI-12345",
+    btnSave: "Save",
+    feedbackModalTitle: "Feedback",
+    feedbackModalSub: "Tell us what you need and we will respond by email.",
+    chipPaymentIssue: "Payment issue",
+    chipDownloadIssue: "Download issue",
+    chipRequestFeatures: "Request features",
+    chipOther: "Other",
+    feedbackEmailLabel: "Email",
+    feedbackMessageLabel: "Message",
+    feedbackMessagePlaceholder: "Tell us what you need",
+    btnFeedback: "Submit feedback",
+    close: "Close",
+    prevOrderAria: "Previous order",
+    nextOrderAria: "Next order",
+    lightboxCloseAria: "Close",
+    lightboxPrevAria: "Previous",
+    lightboxNextAria: "Next",
+    lightboxAlt: "Preview full",
+    lightboxDefaultName: "Preview image",
+    statusSigningIn: "Signing...",
+    statusFetchingMedia: "Fetching media...",
+    statusFetchingDropbox: "Fetching media from Dropbox...",
+    statusFetchingDrive: "Fetching media from Google Drive...",
+    statusSaving: "Saving...",
+    alertEnterClientId: "Please enter client ID.",
+    alertChooseAnotherClientId: "Please choose another client ID.",
+    alertLinkNotDisplayable:
+      "This link cannot be previewed. Use a direct image link or Dropbox/Google Drive file link.",
+    alertSignInFirst: "Please sign in first.",
+    alertSelectOrders: "Please select orders to pay.",
+    alertNoValidOrders: "No valid orders selected.",
+    alertOrdersNotSynced: "Some selected orders are not synced yet. Please wait and try again.",
+    alertLeafPaymentFailed: "Leaf payment failed.",
+    alertLeafPaymentSuccess: "Payment successful for {count} order(s).",
+    alertLeafPaymentCouldNotComplete: "Could not complete Leaf payment.",
+    alertFetchMediaFailed: "Could not fetch media: {error}",
+    alertFetchMediaError: "Error fetching media: {error}",
+    alertFreePlanDailyReached: "Free plan daily limit reached (2 orders/day). Upgrade to continue.",
+    alertFreePlanWeeklyReached: "Free plan weekly limit reached (10 orders/week). Upgrade to continue.",
+    alertEnterOrderNameQuantity: "Please enter at least one order name and quantity.",
+    alertFreePlanQuotaRemaining:
+      "Free plan remaining quota is {available} order(s) right now. Reduce rows or upgrade plan.",
+    alertFreePlanLimitReached: "Free plan limit reached. Upgrade to continue.",
+    alertSaveDbFailedLocal:
+      "Could not save to database. Order saved locally and will sync when the connection is restored.",
+    alertServerConnectFailedLocal:
+      "Could not connect to server. Order saved locally and will sync when the connection is restored.",
+    alertMagicLinkInvalid: "Sign-in link is invalid or expired.",
+    alertVerifyMagicLinkFailed: "Could not verify sign-in link. Please try again.",
+    alertEnterEmail: "Please enter your email.",
+    alertEnterLoginCode: "Please enter the 6-digit sign-in code.",
+    alertLoginCodeInvalid: "Sign-in code is invalid or expired.",
+    alertVerifyLoginCodeFailed: "Could not verify sign-in code. Please try again.",
+    alertSignInFailed: "Sign in failed.",
+    alertSignInFailedRetry: "Sign in failed. Please try again.",
+    alertAuthUnavailable: "Authentication service is unavailable. Please try again.",
+    confirmDeleteOrder: 'Delete order "{name}"?',
+    alertEnterInviteeEmail: "Please enter invitee email.",
+    alertCouldNotSendInvite: "Could not send invite.",
+    alertEnterMessage: "Please enter a message.",
+    alertFeedbackThanks: "Thanks for your feedback! We'll get back to you soon.",
+    alertTopupSuccess: "Leaf top-up successful: +{amount}.",
+    alertPayPalTopupFailed: "PayPal top-up failed.",
+    alertSubscriptionActivatedReferral:
+      "Subscription activated. Referral bonus applied (+1 month for both users).",
+    alertSubscriptionActivated: "Subscription activated via PayPal.",
+    alertSubscriptionFailed: "Subscription failed.",
+    hintSubscriptionNeedSignIn: "Please sign in before starting a subscription.",
+    hintSubscriptionFreeActive: "Free plan is active instantly. Paid checkout is not required.",
+    hintSubscriptionLoadingCheckout: "Loading PayPal subscription checkout...",
+    hintSubscriptionUnavailable: "PayPal subscription checkout is unavailable in this browser.",
+    hintSubscriptionCancelled: "Subscription checkout was cancelled.",
+    hintSubscriptionRenderFailed: "Could not render PayPal subscription button.",
+    upgradeHintBusiness:
+      "Business includes unlimited orders, email notifications, 2-month retention, and 3 seats.",
+    upgradeHintPersonal:
+      "Personal includes unlimited orders, email notifications, 7-day retention, and 1 seat.",
+    upgradeHintFreeUsage:
+      "Free plan: 2 orders/day, 10 orders/week, 12-hour retention. Usage: {today}/2 today, {week}/10 this week.",
+    upgradeHintFreeLimits:
+      "Free plan limits: 2 orders/day, 10 orders/week, storage {retention}.",
+    hintTopupNeedSignIn: "Please sign in before topping up Leaf.",
+    hintTopupEnterAmount: "Enter an amount greater than 0.",
+    hintTopupLoadingCheckout: "Loading PayPal checkout...",
+    hintTopupUnavailable: "PayPal checkout is unavailable in this browser.",
+    hintTopupSandboxBuyer: "Use a PayPal Sandbox buyer account (or sandbox card) to complete top-up.",
+    hintTopupCancelled: "Payment was cancelled.",
+    hintTopupRenderFailed: "Could not render PayPal button.",
+    alertTopupAndTryAgain: "Top up and try again.",
+    walletActivity: "Wallet activity",
+    orderReference: "Order {orderNumber}",
+    hintPayPalPlanMissing: "PayPal plan ID missing for {tier} {cycle}.",
+    hintPayPalBusinessEnv: "Set PAYPAL_PLAN_ID_BUSINESS_MONTHLY/ANNUAL on server.",
+    hintPayPalPlanReady: "Plan: {planLabel} ({planId}). Complete PayPal approval to activate.",
+    planNameFree: "Free",
+    planNamePersonal: "Personal",
+    planNameBusiness: "Business",
+    retentionMonth: "month",
+    retentionDay: "day",
+    retentionHour: "hour",
+    priceMonth: "month",
+    priceYear: "year",
   },
   vi: {
     appTagline: "Thanh toán & tải xuống cho chỉnh sửa media bất động sản",
@@ -215,6 +374,165 @@ const I18N = {
     lineItemLinkPlaceholder: "Liên kết",
     notifNone: "Chưa có thông báo.",
     sellerPlan: "Gói {plan}",
+    addNewClientIdOption: "+ Thêm client id mới",
+    notifDefaultTitle: "Thông báo",
+    galleryClose: "Đóng",
+    galleryDeleteOrder: "Xóa đơn",
+    galleryPay: "Thanh toán",
+    galleryLoadingPreviews: "Đang tải bản xem trước...",
+    payModalTitle: "Thanh toán đơn hàng",
+    payModalSub: "Số dư Leaf credits",
+    payMethodLabel: "Phương thức thanh toán",
+    payMethodValue: "Leaf credits",
+    payRateLabel: "Tỷ giá",
+    payRateValue: "1 Leaf = $1.00 USD",
+    btnTopupLeafFromPay: "Nạp Leaf",
+    btnConfirmPay: "Thanh toán bằng Leaf",
+    payTotalLine: "Tổng: {total} cho {count} đơn",
+    payBalanceLine: "Số dư Leaf: {balance}",
+    payNeedMore: "Cần thêm {needed} Leaf trước khi thanh toán.",
+    payEnough: "Số dư Leaf đã đủ để thanh toán.",
+    topupTitle: "Nạp Leaf",
+    topupSub: "Thanh toán PayPal Sandbox (1 Leaf = $1 USD)",
+    leafAmountLabel: "Số Leaf",
+    topupSummaryLine: "Số nạp: {amount} = {leaf} Leaf",
+    upgradeTitle: "Nâng cấp gói",
+    upgradeSub: "Chọn Free, Personal hoặc Business cho workspace.",
+    cycleMonthly: "Thanh toán theo tháng",
+    cycleAnnual: "Thanh toán theo năm",
+    planFreeTitle: "Free",
+    planFreePrice: "$0 / tháng",
+    planFreeNote: "2 đơn/ngày, tối đa 10 đơn/tuần",
+    planFreeItem1: "Lưu trữ: 12 giờ",
+    planFreeItem2: "1 tài khoản",
+    planPersonalTitle: "Personal",
+    planPersonalNote: "Không giới hạn đơn",
+    planPersonalItem1: "Email thông báo đơn hàng",
+    planPersonalItem2: "Lưu trữ: 7 ngày",
+    planPersonalItem3: "1 tài khoản",
+    planBusinessTitle: "Business",
+    planBusinessNote: "Không giới hạn đơn",
+    planBusinessItem1: "Email thông báo đơn hàng",
+    planBusinessItem2: "Lưu trữ: 2 tháng",
+    planBusinessItem3: "Gồm 3 tài khoản",
+    upgradeHintAuto: "Tự động gia hạn gói trả phí qua PayPal.",
+    referTitle: "Giới thiệu nhận thưởng",
+    referSub: "Mời bằng email. Khi họ đăng ký gói, cả hai nhận 1 tháng miễn phí.",
+    referEmailLabel: "Email người được mời",
+    referEmailPlaceholder: "friend@email.com",
+    btnSendInvite: "Gửi lời mời",
+    referralTotalInvites: "Tổng lượt mời",
+    referralPending: "Đang chờ",
+    referralRewarded: "Đã thưởng",
+    referralNoInvites: "Chưa có lời mời.",
+    referralInviteSent: "Đã gửi lời mời.",
+    referralSending: "Đang gửi...",
+    clientIdModalTitle: "Thêm client ID",
+    clientIdModalSub: "Tạo client ID mới để dùng cho dòng này.",
+    clientIdModalLabel: "Client ID",
+    newClientIdPlaceholder: "CLI-12345",
+    btnSave: "Lưu",
+    feedbackModalTitle: "Phản hồi",
+    feedbackModalSub: "Cho chúng tôi biết bạn cần gì, chúng tôi sẽ phản hồi qua email.",
+    chipPaymentIssue: "Lỗi thanh toán",
+    chipDownloadIssue: "Lỗi tải xuống",
+    chipRequestFeatures: "Yêu cầu tính năng",
+    chipOther: "Khác",
+    feedbackEmailLabel: "Email",
+    feedbackMessageLabel: "Nội dung",
+    feedbackMessagePlaceholder: "Hãy cho chúng tôi biết bạn cần gì",
+    btnFeedback: "Gửi phản hồi",
+    close: "Đóng",
+    prevOrderAria: "Đơn trước",
+    nextOrderAria: "Đơn sau",
+    lightboxCloseAria: "Đóng",
+    lightboxPrevAria: "Trước",
+    lightboxNextAria: "Sau",
+    lightboxAlt: "Xem trước đầy đủ",
+    lightboxDefaultName: "Ảnh xem trước",
+    statusSigningIn: "Đang đăng nhập...",
+    statusFetchingMedia: "Đang lấy media...",
+    statusFetchingDropbox: "Đang lấy media từ Dropbox...",
+    statusFetchingDrive: "Đang lấy media từ Google Drive...",
+    statusSaving: "Đang lưu...",
+    alertEnterClientId: "Vui lòng nhập client ID.",
+    alertChooseAnotherClientId: "Vui lòng chọn client ID khác.",
+    alertLinkNotDisplayable:
+      "Liên kết này không xem trước được. Hãy dùng link ảnh trực tiếp hoặc link file Dropbox/Google Drive.",
+    alertSignInFirst: "Vui lòng đăng nhập trước.",
+    alertSelectOrders: "Vui lòng chọn đơn để thanh toán.",
+    alertNoValidOrders: "Không có đơn hợp lệ.",
+    alertOrdersNotSynced: "Một số đơn chưa đồng bộ xong. Vui lòng thử lại sau.",
+    alertLeafPaymentFailed: "Thanh toán Leaf thất bại.",
+    alertLeafPaymentSuccess: "Thanh toán thành công {count} đơn.",
+    alertLeafPaymentCouldNotComplete: "Không thể hoàn tất thanh toán Leaf.",
+    alertFetchMediaFailed: "Không thể lấy media: {error}",
+    alertFetchMediaError: "Lỗi khi lấy media: {error}",
+    alertFreePlanDailyReached: "Đã đạt giới hạn gói Free theo ngày (2 đơn/ngày). Hãy nâng cấp.",
+    alertFreePlanWeeklyReached: "Đã đạt giới hạn gói Free theo tuần (10 đơn/tuần). Hãy nâng cấp.",
+    alertEnterOrderNameQuantity: "Vui lòng nhập ít nhất một tên đơn và số lượng.",
+    alertFreePlanQuotaRemaining:
+      "Quota còn lại của gói Free hiện là {available} đơn. Hãy giảm số dòng hoặc nâng cấp gói.",
+    alertFreePlanLimitReached: "Đã chạm giới hạn gói Free. Hãy nâng cấp để tiếp tục.",
+    alertSaveDbFailedLocal:
+      "Không thể lưu vào cơ sở dữ liệu. Đơn đã lưu cục bộ và sẽ đồng bộ khi kết nối ổn định.",
+    alertServerConnectFailedLocal:
+      "Không thể kết nối máy chủ. Đơn đã lưu cục bộ và sẽ đồng bộ khi kết nối ổn định.",
+    alertMagicLinkInvalid: "Link đăng nhập không hợp lệ hoặc đã hết hạn.",
+    alertVerifyMagicLinkFailed: "Không thể xác thực link đăng nhập. Vui lòng thử lại.",
+    alertEnterEmail: "Vui lòng nhập email.",
+    alertEnterLoginCode: "Vui lòng nhập mã đăng nhập 6 số.",
+    alertLoginCodeInvalid: "Mã đăng nhập không hợp lệ hoặc đã hết hạn.",
+    alertVerifyLoginCodeFailed: "Không thể xác thực mã đăng nhập. Vui lòng thử lại.",
+    alertSignInFailed: "Đăng nhập thất bại.",
+    alertSignInFailedRetry: "Đăng nhập thất bại. Vui lòng thử lại.",
+    alertAuthUnavailable: "Dịch vụ xác thực đang tạm thời không khả dụng. Vui lòng thử lại.",
+    confirmDeleteOrder: 'Xóa đơn "{name}"?',
+    alertEnterInviteeEmail: "Vui lòng nhập email người được mời.",
+    alertCouldNotSendInvite: "Không thể gửi lời mời.",
+    alertEnterMessage: "Vui lòng nhập nội dung.",
+    alertFeedbackThanks: "Cảm ơn phản hồi của bạn! Chúng tôi sẽ sớm phản hồi.",
+    alertTopupSuccess: "Nạp Leaf thành công: +{amount}.",
+    alertPayPalTopupFailed: "Nạp Leaf qua PayPal thất bại.",
+    alertSubscriptionActivatedReferral:
+      "Đăng ký gói thành công. Đã cộng thưởng giới thiệu (+1 tháng cho cả hai).",
+    alertSubscriptionActivated: "Đăng ký gói qua PayPal thành công.",
+    alertSubscriptionFailed: "Đăng ký gói thất bại.",
+    hintSubscriptionNeedSignIn: "Vui lòng đăng nhập trước khi bắt đầu đăng ký gói.",
+    hintSubscriptionFreeActive: "Gói Free được kích hoạt ngay, không cần checkout trả phí.",
+    hintSubscriptionLoadingCheckout: "Đang tải checkout đăng ký PayPal...",
+    hintSubscriptionUnavailable: "Checkout đăng ký PayPal không khả dụng trên trình duyệt này.",
+    hintSubscriptionCancelled: "Đã hủy quy trình đăng ký gói.",
+    hintSubscriptionRenderFailed: "Không thể hiển thị nút đăng ký PayPal.",
+    upgradeHintBusiness:
+      "Business gồm đơn không giới hạn, email thông báo đơn hàng, lưu trữ 2 tháng và 3 chỗ ngồi.",
+    upgradeHintPersonal:
+      "Personal gồm đơn không giới hạn, email thông báo đơn hàng, lưu trữ 7 ngày và 1 chỗ ngồi.",
+    upgradeHintFreeUsage:
+      "Gói Free: 2 đơn/ngày, 10 đơn/tuần, lưu trữ 12 giờ. Đã dùng: {today}/2 hôm nay, {week}/10 tuần này.",
+    upgradeHintFreeLimits:
+      "Giới hạn gói Free: 2 đơn/ngày, 10 đơn/tuần, lưu trữ {retention}.",
+    hintTopupNeedSignIn: "Vui lòng đăng nhập trước khi nạp Leaf.",
+    hintTopupEnterAmount: "Nhập số tiền lớn hơn 0.",
+    hintTopupLoadingCheckout: "Đang tải checkout PayPal...",
+    hintTopupUnavailable: "Checkout PayPal không khả dụng trên trình duyệt này.",
+    hintTopupSandboxBuyer: "Dùng tài khoản buyer sandbox (hoặc thẻ sandbox) để nạp tiền.",
+    hintTopupCancelled: "Đã hủy thanh toán.",
+    hintTopupRenderFailed: "Không thể hiển thị nút PayPal.",
+    alertTopupAndTryAgain: "Hãy nạp thêm rồi thử lại.",
+    walletActivity: "Hoạt động ví",
+    orderReference: "Đơn {orderNumber}",
+    hintPayPalPlanMissing: "Thiếu PayPal plan ID cho {tier} {cycle}.",
+    hintPayPalBusinessEnv: "Hãy cấu hình PAYPAL_PLAN_ID_BUSINESS_MONTHLY/ANNUAL trên server.",
+    hintPayPalPlanReady: "Gói: {planLabel} ({planId}). Hoàn tất duyệt PayPal để kích hoạt.",
+    planNameFree: "Miễn phí",
+    planNamePersonal: "Cá nhân",
+    planNameBusiness: "Doanh nghiệp",
+    retentionMonth: "tháng",
+    retentionDay: "ngày",
+    retentionHour: "giờ",
+    priceMonth: "tháng",
+    priceYear: "năm",
   },
 };
 
@@ -226,6 +544,13 @@ const t = (key, params = {}) => {
     value = value.replaceAll(`{${name}}`, String(params[name]));
   });
   return value;
+};
+
+const getAddNewClientIdOption = () => t("addNewClientIdOption");
+const isAddNewClientIdOption = (value) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return false;
+  return [getAddNewClientIdOption(), ...ADD_NEW_CLIENT_ID_OPTION_FALLBACKS].includes(trimmed);
 };
 
 const loadLanguage = () => {
@@ -295,11 +620,111 @@ const applyLanguage = () => {
   setText("paymentHeadAmount", "paymentHeadAmount");
   setText("paymentHeadBalance", "paymentHeadBalance");
   setText("languageLabel", "languageLabel");
+  setText("btnCloseGallery", "galleryClose");
+  setText("btnDeleteOrder", "galleryDeleteOrder");
+  setText("btnPaySingle", "galleryPay");
+  setText("payModalTitle", "payModalTitle");
+  setText("payModalSub", "payModalSub");
+  setText("payMethodLabel", "payMethodLabel");
+  setText("payRateLabel", "payRateLabel");
+  setText("btnTopupLeafFromPay", "btnTopupLeafFromPay");
+  setText("btnConfirmPay", "btnConfirmPay");
+  setText("topupTitle", "topupTitle");
+  setText("topupSub", "topupSub");
+  setText("leafAmountLabel", "leafAmountLabel");
+  setText("upgradeTitle", "upgradeTitle");
+  setText("upgradeSub", "upgradeSub");
+  setText("cycleMonthly", "cycleMonthly");
+  setText("cycleAnnual", "cycleAnnual");
+  setText("planFreeTitle", "planFreeTitle");
+  setText("planFreePrice", "planFreePrice");
+  setText("planFreeNote", "planFreeNote");
+  setText("planFreeItem1", "planFreeItem1");
+  setText("planFreeItem2", "planFreeItem2");
+  setText("planPersonalTitle", "planPersonalTitle");
+  setText("planPersonalNote", "planPersonalNote");
+  setText("planPersonalItem1", "planPersonalItem1");
+  setText("planPersonalItem2", "planPersonalItem2");
+  setText("planPersonalItem3", "planPersonalItem3");
+  setText("planBusinessTitle", "planBusinessTitle");
+  setText("planBusinessNote", "planBusinessNote");
+  setText("planBusinessItem1", "planBusinessItem1");
+  setText("planBusinessItem2", "planBusinessItem2");
+  setText("planBusinessItem3", "planBusinessItem3");
+  setText("upgradeHint", "upgradeHintAuto");
+  setText("referTitle", "referTitle");
+  setText("referSub", "referSub");
+  setText("referEmailLabel", "referEmailLabel");
+  setText("btnSendInvite", "btnSendInvite");
+  setText("clientIdModalTitle", "clientIdModalTitle");
+  setText("clientIdModalSub", "clientIdModalSub");
+  setText("clientIdModalLabel", "clientIdModalLabel");
+  setText("btnSaveClientId", "btnSave");
+  setText("feedbackModalTitle", "feedbackModalTitle");
+  setText("feedbackModalSub", "feedbackModalSub");
+  setText("chipPaymentIssue", "chipPaymentIssue");
+  setText("chipDownloadIssue", "chipDownloadIssue");
+  setText("chipRequestFeatures", "chipRequestFeatures");
+  setText("chipOther", "chipOther");
+  setText("feedbackEmailLabel", "feedbackEmailLabel");
+  setText("feedbackMessageLabel", "feedbackMessageLabel");
+  setText("btnFeedback", "btnFeedback");
+  setText("btnClosePay", "close");
+  setText("btnCloseTopup", "close");
+  setText("btnCloseSub", "close");
+  setText("btnCloseRefer", "close");
+  setText("btnCloseClientIdModal", "close");
+  setText("btnCloseFeedback", "close");
 
   const loginEmail = el("loginEmail");
   if (loginEmail) loginEmail.placeholder = "name@email.com";
+  const loginCode = el("loginCode");
+  if (loginCode) loginCode.placeholder = "123456";
   const orderSearch = el("orderSearch");
   if (orderSearch) orderSearch.placeholder = t("orderSearchPlaceholder");
+  const referInviteEmail = el("referInviteEmail");
+  if (referInviteEmail) referInviteEmail.placeholder = t("referEmailPlaceholder");
+  const newClientIdInput = el("newClientIdInput");
+  if (newClientIdInput) newClientIdInput.placeholder = t("newClientIdPlaceholder");
+  const feedbackEmail = el("feedbackEmail");
+  if (feedbackEmail) feedbackEmail.placeholder = "name@email.com";
+  const feedbackMessage = el("feedbackMessage");
+  if (feedbackMessage) feedbackMessage.placeholder = t("feedbackMessagePlaceholder");
+  const payMethodValue = el("payMethodValue");
+  if (payMethodValue) payMethodValue.value = t("payMethodValue");
+  const payRateValue = el("payRateValue");
+  if (payRateValue) payRateValue.value = t("payRateValue");
+  const btnNotifications = el("btnNotifications");
+  if (btnNotifications) btnNotifications.setAttribute("aria-label", t("notifHead"));
+  const btnPrevOrder = el("btnPrevOrder");
+  if (btnPrevOrder) btnPrevOrder.setAttribute("aria-label", t("prevOrderAria"));
+  const btnNextOrder = el("btnNextOrder");
+  if (btnNextOrder) btnNextOrder.setAttribute("aria-label", t("nextOrderAria"));
+  const btnCloseLightbox = el("btnCloseLightbox");
+  if (btnCloseLightbox) btnCloseLightbox.setAttribute("aria-label", t("lightboxCloseAria"));
+  const btnPrevLightbox = el("btnPrevLightbox");
+  if (btnPrevLightbox) btnPrevLightbox.setAttribute("aria-label", t("lightboxPrevAria"));
+  const btnNextLightbox = el("btnNextLightbox");
+  if (btnNextLightbox) btnNextLightbox.setAttribute("aria-label", t("lightboxNextAria"));
+  const lightboxImg = el("lightboxImg");
+  if (lightboxImg) lightboxImg.setAttribute("alt", t("lightboxAlt"));
+  document.querySelectorAll("#lineItems .line-item").forEach((row) => {
+    const typeInput = row.querySelector('[data-field="type"]');
+    const countInput = row.querySelector('[data-field="count"]');
+    const clientIdInput = row.querySelector('[data-field="clientId"]');
+    const clientEmailInput = row.querySelector('[data-field="clientEmail"]');
+    const linkInput = row.querySelector('[data-field="link"]');
+    if (typeInput) typeInput.placeholder = t("lineItemTypePlaceholder");
+    if (countInput) countInput.placeholder = t("lineItemCountPlaceholder");
+    if (clientIdInput) clientIdInput.placeholder = t("lineItemClientIdPlaceholder");
+    if (clientEmailInput) clientEmailInput.placeholder = t("lineItemClientEmailPlaceholder");
+    if (linkInput) linkInput.placeholder = t("lineItemLinkPlaceholder");
+    const priceHint = row.querySelector(".price-hint");
+    if (priceHint) {
+      const price = Number(row.dataset.unitPrice || 0).toFixed(2);
+      priceHint.innerHTML = `${t("lineItemUnitPrice")}: $<span>${price}</span>`;
+    }
+  });
 
   const statusFilter = el("orderStatusFilter");
   if (statusFilter && statusFilter.options.length >= 3) {
@@ -323,6 +748,7 @@ const applyLanguage = () => {
   const languageSelect = el("languageSelect");
   if (languageSelect) languageSelect.value = state.lang;
 
+  updateUpgradePricing();
   setLoginChallengeActive(!el("loginCodePanel").classList.contains("hidden"));
   updatePlanBadge();
   renderOrders();
@@ -454,17 +880,17 @@ const formatStatus = (status) => {
 
 const formatMoney = (amount) => `$${Number(amount || 0).toFixed(2)}`;
 const getPlanLabel = (tier) => {
-  if (tier === "business") return "Business";
-  if (tier === "personal") return "Personal";
-  return "Free";
+  if (tier === "business") return t("planNameBusiness");
+  if (tier === "personal") return t("planNamePersonal");
+  return t("planNameFree");
 };
 
 const formatRetention = (hours) => {
   const value = Number(hours || 0);
   if (value <= 0) return "-";
-  if (value % (24 * 30) === 0) return `${value / (24 * 30)} month`;
-  if (value % 24 === 0) return `${value / 24} day`;
-  return `${value} hour`;
+  if (value % (24 * 30) === 0) return `${value / (24 * 30)} ${t("retentionMonth")}`;
+  if (value % 24 === 0) return `${value / 24} ${t("retentionDay")}`;
+  return `${value} ${t("retentionHour")}`;
 };
 
 const updatePlanBadge = () => {
@@ -522,7 +948,7 @@ const renderNotifications = () => {
     .map(
       (item) => `
       <div class="notif-item">
-        <div class="notif-title">${item.title || "Notification"}</div>
+        <div class="notif-title">${item.title || t("notifDefaultTitle")}</div>
         <div class="notif-msg">${item.message || "-"}</div>
         <div class="notif-time">${formatNotifDateTime(item.createdAt)}</div>
       </div>
@@ -589,12 +1015,12 @@ const renderClientIdOptions = () => {
   if (!list) return;
   const options = getClientIdOptions();
   const optionHtml = options.map((id) => `<option value="${id}"></option>`).join("");
-  list.innerHTML = `${optionHtml}<option value="${ADD_NEW_CLIENT_ID_OPTION}"></option>`;
+  list.innerHTML = `${optionHtml}<option value="${getAddNewClientIdOption()}"></option>`;
 };
 
 const rememberClientId = (value) => {
   const id = String(value || "").trim();
-  if (!id || id === ADD_NEW_CLIENT_ID_OPTION) return;
+  if (!id || isAddNewClientIdOption(id)) return;
   if (!Array.isArray(state.customClientIds)) state.customClientIds = [];
   if (!state.customClientIds.includes(id)) {
     state.customClientIds.push(id);
@@ -616,11 +1042,11 @@ const openClientIdModal = (targetInput) => {
 const saveNewClientId = () => {
   const value = String((el("newClientIdInput").value || "")).trim();
   if (!value) {
-    alert("Please enter client ID.");
+    alert(t("alertEnterClientId"));
     return;
   }
-  if (value === ADD_NEW_CLIENT_ID_OPTION) {
-    alert("Please choose another client ID.");
+  if (isAddNewClientIdOption(value)) {
+    alert(t("alertChooseAnotherClientId"));
     return;
   }
   rememberClientId(value);
@@ -800,7 +1226,7 @@ const addLineItem = (
   const clientIdInput = row.querySelector('[data-field="clientId"]');
   const handleClientIdInput = () => {
     const value = String((clientIdInput && clientIdInput.value) || "").trim();
-    if (value === ADD_NEW_CLIENT_ID_OPTION) {
+    if (isAddNewClientIdOption(value)) {
       clientIdInput.value = "";
       openClientIdModal(clientIdInput);
     }
@@ -994,7 +1420,9 @@ const openGallery = async (orderId) => {
 
   if (shouldFetch) {
     const grid = el("galleryGrid");
-    grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 24px;">Loading previews...</div>`;
+    grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 24px;">${t(
+      "galleryLoadingPreviews"
+    )}</div>`;
 
     const uniqueLinks = Array.from(new Set(links));
     const fetchedFiles = [];
@@ -1081,7 +1509,7 @@ const setLightboxIndex = (index) => {
     lightboxImg.onerror = null;
   };
   lightboxImg.src = current.src;
-  el("lightboxName").textContent = current.name || "Preview image";
+  el("lightboxName").textContent = current.name || t("lightboxDefaultName");
   el("lightboxCount").textContent = `${nextIndex + 1} / ${count}`;
   resetLightboxZoom();
   updateLightboxNav();
@@ -1090,7 +1518,7 @@ const setLightboxIndex = (index) => {
 const openLightbox = (index) => {
   const items = state.lightbox.items;
   if (!items.length || index < 0 || index >= items.length) {
-    alert("Link này không hiển thị được. Hãy dùng link ảnh trực tiếp hoặc link file Dropbox/Google Drive.");
+    alert(t("alertLinkNotDisplayable"));
     return;
   }
 
@@ -1122,13 +1550,13 @@ const openPayModal = (orderIds) => {
   state.payQueue = orderIds;
   const total = getPayQueueTotal(orderIds);
   const count = orderIds.length;
-  el("payTotal").textContent = `Total: ${formatMoney(total)} for ${count} order${count > 1 ? "s" : ""}`;
-  el("payBalance").textContent = `Leaf balance: ${formatMoney(state.leafBalance)}`;
+  el("payTotal").textContent = t("payTotalLine", { total: formatMoney(total), count });
+  el("payBalance").textContent = t("payBalanceLine", { balance: formatMoney(state.leafBalance) });
   const needed = Math.max(0, Number((total - state.leafBalance).toFixed(2)));
   el("payNeeded").textContent =
     needed > 0
-      ? `Need ${formatMoney(needed)} more Leaf before payment.`
-      : "Enough Leaf balance to pay now.";
+      ? t("payNeedMore", { needed: formatMoney(needed) })
+      : t("payEnough");
   el("btnConfirmPay").disabled = needed > 0;
   el("payModal").classList.remove("hidden");
 };
@@ -1176,7 +1604,9 @@ const mapLedgerToPayments = (ledger = []) =>
     type: entry.type,
     description:
       entry.description ||
-      (entry.order && entry.order.orderNumber ? `Order ${entry.order.orderNumber}` : "Wallet activity"),
+      (entry.order && entry.order.orderNumber
+        ? t("orderReference", { orderNumber: entry.order.orderNumber })
+        : t("walletActivity")),
     amount: Number(entry.amount || 0),
     balanceAfter: Number(entry.balanceAfter || 0),
     reference: entry.reference || "",
@@ -1238,15 +1668,15 @@ const renderReferralStats = () => {
   const stats = state.referral.stats || { total: 0, pending: 0, rewarded: 0 };
   statsEl.innerHTML = `
     <div class="stat-card">
-      <div class="stat-label">Total invites</div>
+      <div class="stat-label">${t("referralTotalInvites")}</div>
       <div class="stat-value">${Number(stats.total || 0)}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Pending</div>
+      <div class="stat-label">${t("referralPending")}</div>
       <div class="stat-value">${Number(stats.pending || 0)}</div>
     </div>
     <div class="stat-card highlight">
-      <div class="stat-label">Rewarded</div>
+      <div class="stat-label">${t("referralRewarded")}</div>
       <div class="stat-value">${Number(stats.rewarded || 0)}</div>
     </div>
   `;
@@ -1257,7 +1687,7 @@ const renderReferralList = () => {
   if (!listEl) return;
   const invites = Array.isArray(state.referral.invites) ? state.referral.invites : [];
   if (!invites.length) {
-    listEl.innerHTML = `<div class="refer-empty">No invites yet.</div>`;
+    listEl.innerHTML = `<div class="refer-empty">${t("referralNoInvites")}</div>`;
     return;
   }
   listEl.innerHTML = invites
@@ -1421,10 +1851,10 @@ const updateUpgradePricing = () => {
   const personal = document.querySelector('.upgrade-plan-card[data-tier="personal"] .plan-price');
   const business = document.querySelector('.upgrade-plan-card[data-tier="business"] .plan-price');
   if (personal) {
-    personal.textContent = cycle === "annual" ? "$390 / year" : "$39 / month";
+    personal.textContent = cycle === "annual" ? `$390 / ${t("priceYear")}` : `$39 / ${t("priceMonth")}`;
   }
   if (business) {
-    business.textContent = cycle === "annual" ? "$990 / year" : "$99 / month";
+    business.textContent = cycle === "annual" ? `$990 / ${t("priceYear")}` : `$99 / ${t("priceMonth")}`;
   }
 };
 
@@ -1438,15 +1868,13 @@ const renderPayPalSubscriptionButton = async () => {
   const upgradeHint = el("upgradeHint");
   if (upgradeHint) {
     if (tier === "business") {
-      upgradeHint.textContent =
-        "Business includes unlimited orders, email notifications, 2-month retention, and 3 seats.";
+      upgradeHint.textContent = t("upgradeHintBusiness");
     } else if (tier === "personal") {
-      upgradeHint.textContent =
-        "Personal includes unlimited orders, email notifications, 7-day retention, and 1 seat.";
+      upgradeHint.textContent = t("upgradeHintPersonal");
     } else {
       const todayUsed = Number((state.usage && state.usage.ordersToday) || 0);
       const weekUsed = Number((state.usage && state.usage.ordersThisWeek) || 0);
-      upgradeHint.textContent = `Free plan: 2 orders/day, 10 orders/week, 12-hour retention. Usage: ${todayUsed}/2 today, ${weekUsed}/10 this week.`;
+      upgradeHint.textContent = t("upgradeHintFreeUsage", { today: todayUsed, week: weekUsed });
     }
   }
 
@@ -1454,22 +1882,20 @@ const renderPayPalSubscriptionButton = async () => {
 
   if (!email) {
     container.innerHTML = "";
-    hint.textContent = "Please sign in before starting a subscription.";
+    hint.textContent = t("hintSubscriptionNeedSignIn");
     return;
   }
 
   if (tier === "free") {
     container.innerHTML = "";
-    hint.textContent = "Free plan is active instantly. Paid checkout is not required.";
+    hint.textContent = t("hintSubscriptionFreeActive");
     if (upgradeHint) {
-      upgradeHint.textContent = `Free plan limits: 2 orders/day, 10 orders/week, storage ${formatRetention(
-        12
-      )}.`;
+      upgradeHint.textContent = t("upgradeHintFreeLimits", { retention: formatRetention(12) });
     }
     return;
   }
 
-  hint.textContent = "Loading PayPal subscription checkout...";
+  hint.textContent = t("hintSubscriptionLoadingCheckout");
 
   try {
     await fetchPayPalConfig();
@@ -1484,9 +1910,9 @@ const renderPayPalSubscriptionButton = async () => {
     (tier === "personal" ? state.paypalPlans[billingCycle] : "");
   if (!planId) {
     container.innerHTML = "";
-    hint.textContent = `PayPal plan ID missing for ${tier} ${billingCycle}.`;
+    hint.textContent = t("hintPayPalPlanMissing", { tier, cycle: billingCycle });
     if (tier === "business") {
-      hint.textContent += " Set PAYPAL_PLAN_ID_BUSINESS_MONTHLY/ANNUAL on server.";
+      hint.textContent += ` ${t("hintPayPalBusinessEnv")}`;
     }
     return;
   }
@@ -1501,12 +1927,12 @@ const renderPayPalSubscriptionButton = async () => {
 
   if (!window.paypalSub || typeof window.paypalSub.Buttons !== "function") {
     container.innerHTML = "";
-    hint.textContent = "PayPal subscription checkout is unavailable in this browser.";
+    hint.textContent = t("hintSubscriptionUnavailable");
     return;
   }
 
   container.innerHTML = "";
-  hint.textContent = `Plan: ${planLabel} (${planId}). Complete PayPal approval to activate.`;
+  hint.textContent = t("hintPayPalPlanReady", { planLabel, planId });
 
   window.paypalSub
     .Buttons({
@@ -1542,23 +1968,23 @@ const renderPayPalSubscriptionButton = async () => {
         closeSubscriptionModal();
         await Promise.all([fetchSubscriptionStatus(), fetchReferralData(), fetchNotificationsFromDB()]);
         if (result.referralReward) {
-          alert("Subscription activated. Referral bonus applied (+1 month for both users).");
+          alert(t("alertSubscriptionActivatedReferral"));
         } else {
-          alert("Subscription activated via PayPal.");
+          alert(t("alertSubscriptionActivated"));
         }
       },
       onCancel: () => {
-        hint.textContent = "Subscription checkout was cancelled.";
+        hint.textContent = t("hintSubscriptionCancelled");
       },
       onError: (err) => {
         console.error("PayPal subscription error:", err);
-        alert(err && err.message ? err.message : "Subscription failed.");
+        alert(err && err.message ? err.message : t("alertSubscriptionFailed"));
       },
     })
     .render("#paypalSubContainer")
     .catch((err) => {
       console.error("PayPal subscription render error:", err);
-      hint.textContent = "Could not render PayPal subscription button.";
+      hint.textContent = t("hintSubscriptionRenderFailed");
     });
 };
 
@@ -1578,21 +2004,24 @@ const renderPayPalTopupButton = async () => {
   const amount = Number(el("leafTopupAmount").value || state.topupAmount || 0);
   state.topupAmount = amount;
 
-  el("leafTopupSummary").textContent = `Top-up amount: ${formatMoney(amount)} = ${amount.toFixed(2)} Leaf`;
+  el("leafTopupSummary").textContent = t("topupSummaryLine", {
+    amount: formatMoney(amount),
+    leaf: amount.toFixed(2),
+  });
 
   if (!email) {
     container.innerHTML = "";
-    hint.textContent = "Please sign in before topping up Leaf.";
+    hint.textContent = t("hintTopupNeedSignIn");
     return;
   }
 
   if (!Number.isFinite(amount) || amount <= 0) {
     container.innerHTML = "";
-    hint.textContent = "Enter an amount greater than 0.";
+    hint.textContent = t("hintTopupEnterAmount");
     return;
   }
 
-  hint.textContent = "Loading PayPal checkout...";
+  hint.textContent = t("hintTopupLoadingCheckout");
 
   try {
     await ensurePayPalSdkLoaded();
@@ -1604,12 +2033,12 @@ const renderPayPalTopupButton = async () => {
 
   if (!window.paypal || typeof window.paypal.Buttons !== "function") {
     container.innerHTML = "";
-    hint.textContent = "PayPal checkout is unavailable in this browser.";
+    hint.textContent = t("hintTopupUnavailable");
     return;
   }
 
   container.innerHTML = "";
-  hint.textContent = "Use a PayPal Sandbox buyer account (or sandbox card) to complete top-up.";
+  hint.textContent = t("hintTopupSandboxBuyer");
 
   window.paypal
     .Buttons({
@@ -1651,20 +2080,20 @@ const renderPayPalTopupButton = async () => {
 
         await fetchWalletFromDB();
         closeTopupModal();
-        alert(`Leaf top-up successful: +${formatMoney(captureData.amount)}.`);
+        alert(t("alertTopupSuccess", { amount: formatMoney(captureData.amount) }));
       },
       onCancel: () => {
-        hint.textContent = "Payment was cancelled.";
+        hint.textContent = t("hintTopupCancelled");
       },
       onError: (err) => {
         console.error("PayPal top-up error:", err);
-        alert(err && err.message ? err.message : "PayPal top-up failed.");
+        alert(err && err.message ? err.message : t("alertPayPalTopupFailed"));
       },
     })
     .render("#paypalTopupContainer")
     .catch((err) => {
       console.error("PayPal render error:", err);
-      hint.textContent = "Could not render PayPal button.";
+      hint.textContent = t("hintTopupRenderFailed");
     });
 };
 
@@ -1677,7 +2106,7 @@ const openTopupModal = async () => {
 const topupLeaf = async () => {
   const email = state.user && state.user.email;
   if (!email) {
-    alert("Please sign in first.");
+    alert(t("alertSignInFirst"));
     return;
   }
   await openTopupModal();
@@ -1686,7 +2115,7 @@ const topupLeaf = async () => {
 const payOrdersWithLeaf = async (orderIds) => {
   const email = state.user && state.user.email;
   if (!email) {
-    alert("Please sign in first.");
+    alert(t("alertSignInFirst"));
     return false;
   }
 
@@ -1694,12 +2123,12 @@ const payOrdersWithLeaf = async (orderIds) => {
     .map((id) => state.orders.find((order) => order.id === id))
     .filter(Boolean);
   if (!selected.length) {
-    alert("No valid orders selected.");
+    alert(t("alertNoValidOrders"));
     return false;
   }
   const unsynced = selected.filter((order) => !order.dbId);
   if (unsynced.length) {
-    alert("Some selected orders are not synced to database yet. Please wait and try again.");
+    alert(t("alertOrdersNotSynced"));
     return false;
   }
 
@@ -1718,55 +2147,57 @@ const payOrdersWithLeaf = async (orderIds) => {
     if (!data.success) {
       if (data.code === "INSUFFICIENT_BALANCE") {
         alert(
-          `Not enough Leaf. Need ${formatMoney(data.missingAmount || 0)} more.\nTop up and try again.`
+          `${t("payNeedMore", { needed: formatMoney(data.missingAmount || 0) })}\n${t(
+            "alertTopupAndTryAgain"
+          )}`
         );
       } else {
-        alert(data.error || "Leaf payment failed.");
+        alert(data.error || t("alertLeafPaymentFailed"));
       }
       return false;
     }
 
     await Promise.all([fetchOrdersFromDB(), fetchWalletFromDB(), fetchNotificationsFromDB()]);
-    alert(`Payment successful for ${data.paidOrders.length} order(s).`);
+    alert(t("alertLeafPaymentSuccess", { count: data.paidOrders.length }));
     return true;
   } catch (err) {
     console.error("Leaf payment failed:", err);
-    alert("Could not complete Leaf payment.");
+    alert(t("alertLeafPaymentCouldNotComplete"));
     return false;
   }
 };
 
 // Helper function to fetch media from Dropbox/Google Drive links
 const fetchMediaFromLink = async (link) => {
-  if (!link || (!link.includes('dropbox.com') && !link.includes('drive.google.com'))) {
-    console.log('Not a Dropbox/Drive link:', link);
+  if (!link || (!link.includes("dropbox.com") && !link.includes("drive.google.com"))) {
+    console.log("Not a Dropbox/Drive link:", link);
     return null;
   }
 
-  console.log('Fetching media from link:', link);
+  console.log("Fetching media from link:", link);
 
   try {
-    const response = await fetch('/api/fetch-media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: link })
+    const response = await fetch("/api/fetch-media", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: link }),
     });
 
     const data = await response.json();
-    console.log('Fetch media response:', data);
+    console.log("Fetch media response:", data);
 
     if (data.success && data.files && data.files.length > 0) {
       console.log(`Successfully fetched ${data.files.length} files`);
       return data.files;
     } else {
-      console.error('Fetch media failed:', data.error || 'No files returned');
+      console.error("Fetch media failed:", data.error || "No files returned");
       if (data.error) {
-        alert(`Could not fetch media: ${data.error}`);
+        alert(t("alertFetchMediaFailed", { error: data.error }));
       }
     }
   } catch (err) {
-    console.error('Failed to fetch media:', err);
-    alert(`Error fetching media: ${err.message}`);
+    console.error("Failed to fetch media:", err);
+    alert(t("alertFetchMediaError", { error: err.message }));
   }
 
   return null;
@@ -1780,7 +2211,7 @@ const createOrder = async () => {
     Number.isFinite(Number(features.dailyOrderLimit)) &&
     Number(usage.ordersToday || 0) >= Number(features.dailyOrderLimit)
   ) {
-    alert("Free plan daily limit reached (2 orders/day). Upgrade to continue.");
+    alert(t("alertFreePlanDailyReached"));
     await openSubscriptionModal();
     return;
   }
@@ -1789,7 +2220,7 @@ const createOrder = async () => {
     Number.isFinite(Number(features.weeklyOrderLimit)) &&
     Number(usage.ordersThisWeek || 0) >= Number(features.weeklyOrderLimit)
   ) {
-    alert("Free plan weekly limit reached (10 orders/week). Upgrade to continue.");
+    alert(t("alertFreePlanWeeklyReached"));
     await openSubscriptionModal();
     return;
   }
@@ -1816,7 +2247,7 @@ const createOrder = async () => {
   const validItems = items.filter((item) => item.type && item.count);
 
   if (!validItems.length) {
-    alert("Please enter at least one order name and quantity.");
+    alert(t("alertEnterOrderNameQuantity"));
     return;
   }
 
@@ -1828,7 +2259,7 @@ const createOrder = async () => {
     const available = Math.min(availableDaily, availableWeekly);
     if (validItems.length > available) {
       alert(
-        `Free plan remaining quota is ${available} order(s) right now. Reduce rows or upgrade plan.`
+        t("alertFreePlanQuotaRemaining", { available })
       );
       await openSubscriptionModal();
       return;
@@ -1838,7 +2269,7 @@ const createOrder = async () => {
   // Disable button while saving
   const btnCreate = el("btnCreate");
   btnCreate.disabled = true;
-  btnCreate.textContent = "Fetching media...";
+  btnCreate.textContent = t("statusFetchingMedia");
 
   const newOrders = [];
 
@@ -1850,11 +2281,13 @@ const createOrder = async () => {
     // Fetch media files if link is provided
     let mediaFiles = null;
     if (item.link) {
-      btnCreate.textContent = `Fetching media from ${item.link.includes('dropbox') ? 'Dropbox' : 'Google Drive'}...`;
+      btnCreate.textContent = item.link.includes("dropbox")
+        ? t("statusFetchingDropbox")
+        : t("statusFetchingDrive");
       mediaFiles = await fetchMediaFromLink(item.link);
     }
 
-    btnCreate.textContent = "Saving...";
+    btnCreate.textContent = t("statusSaving");
 
     try {
       const response = await fetch("/api/orders", {
@@ -1901,13 +2334,13 @@ const createOrder = async () => {
           state.usage = data.usage || state.usage;
           updatePlanBadge();
           await openSubscriptionModal();
-          alert(data.error || "Free plan limit reached. Upgrade to continue.");
+          alert(data.error || t("alertFreePlanLimitReached"));
           btnCreate.disabled = false;
-          btnCreate.textContent = "Apply";
+          btnCreate.textContent = t("btnCreateApply");
           return;
         }
         console.error("API error:", data);
-        alert("Could not save to database. Order saved locally and will sync when the connection is restored.");
+        alert(t("alertSaveDbFailedLocal"));
         // Fallback to local-only order
         newOrders.push({
           id: `ORD-${Math.floor(Math.random() * 9000 + 1000)}`,
@@ -1924,7 +2357,7 @@ const createOrder = async () => {
       }
     } catch (err) {
       console.error("Failed to save order to database:", err);
-      alert("Could not connect to server. Order saved locally and will sync when the connection is restored.");
+      alert(t("alertServerConnectFailedLocal"));
       // Fallback to local-only order
       newOrders.push({
         id: `ORD-${Math.floor(Math.random() * 9000 + 1000)}`,
@@ -1952,7 +2385,7 @@ const createOrder = async () => {
   switchTab("overview");
 
   btnCreate.disabled = false;
-  btnCreate.textContent = "Apply";
+  btnCreate.textContent = t("btnCreateApply");
 };
 
 const switchTab = (tab) => {
@@ -2045,14 +2478,14 @@ const verifyMagicLinkToken = async (authToken) => {
     });
     const data = await response.json();
     if (!response.ok || !data.success || !data.user) {
-      alert(data.error || "Sign-in link is invalid or expired.");
+      alert(data.error || t("alertMagicLinkInvalid"));
       return false;
     }
     await applyAuthenticatedSession(data);
     return true;
   } catch (err) {
     console.error("Magic link verification error:", err);
-    alert("Could not verify sign-in link. Please try again.");
+    alert(t("alertVerifyMagicLinkFailed"));
     return false;
   } finally {
     clearAuthTokenFromUrl();
@@ -2063,11 +2496,11 @@ const verifyLoginCode = async () => {
   const email = String((el("loginEmail").value || "")).trim();
   const code = String((el("loginCode").value || "")).trim();
   if (!email) {
-    alert("Please enter your email.");
+    alert(t("alertEnterEmail"));
     return false;
   }
   if (!code) {
-    alert("Please enter the 6-digit sign-in code.");
+    alert(t("alertEnterLoginCode"));
     return false;
   }
 
@@ -2083,14 +2516,14 @@ const verifyLoginCode = async () => {
     });
     const data = await response.json();
     if (!response.ok || !data.success || !data.user) {
-      alert(data.error || "Sign-in code is invalid or expired.");
+      alert(data.error || t("alertLoginCodeInvalid"));
       return false;
     }
     await applyAuthenticatedSession(data);
     return true;
   } catch (err) {
     console.error("Sign-in code verification error:", err);
-    alert("Could not verify sign-in code. Please try again.");
+    alert(t("alertVerifyLoginCodeFailed"));
     return false;
   } finally {
     btn.disabled = false;
@@ -2134,13 +2567,13 @@ const setupEvents = () => {
 
     const email = el("loginEmail").value.trim();
     if (!email) {
-      alert("Please enter your email.");
+      alert(t("alertEnterEmail"));
       return;
     }
 
     const btn = el("btnLogin");
     btn.disabled = true;
-    btn.textContent = t("btnSigning");
+    btn.textContent = t("statusSigningIn");
 
     try {
       const response = await fetch("/api/auth", {
@@ -2154,11 +2587,15 @@ const setupEvents = () => {
       if (response.ok && data.success) {
         setLoginChallengeActive(true);
       } else {
-        alert(data.hint ? `${data.error || "Sign in failed"}\n${data.hint}` : (data.error || "Sign in failed. Please try again."));
+        alert(
+          data.hint
+            ? `${data.error || t("alertSignInFailed")}\n${data.hint}`
+            : data.error || t("alertSignInFailedRetry")
+        );
       }
     } catch (err) {
       console.error("Login error:", err);
-      alert("Authentication service is unavailable. Please try again.");
+      alert(t("alertAuthUnavailable"));
     }
 
     btn.disabled = false;
@@ -2241,7 +2678,7 @@ const setupEvents = () => {
     if (!state.activeOrderId) return;
     const order = state.orders.find((o) => o.id === state.activeOrderId);
     if (!order) return;
-    if (!confirm(`Delete order "${order.name}"?`)) return;
+    if (!confirm(t("confirmDeleteOrder", { name: order.name }))) return;
 
     // Delete from database if synced
     if (order.dbId) {
@@ -2272,7 +2709,7 @@ const setupEvents = () => {
   el("btnBulkPay").addEventListener("click", () => {
     const ids = Array.from(state.selectedOrders);
     if (!ids.length) {
-      alert("Please select orders to pay.");
+      alert(t("alertSelectOrders"));
       return;
     }
     openPayModal(ids);
@@ -2381,17 +2818,17 @@ const setupEvents = () => {
   el("btnSendInvite").addEventListener("click", async () => {
     const inviteeEmail = (el("referInviteEmail").value || "").trim().toLowerCase();
     if (!inviteeEmail) {
-      alert("Please enter invitee email.");
+      alert(t("alertEnterInviteeEmail"));
       return;
     }
     if (!state.user || !state.user.email) {
-      alert("Please sign in first.");
+      alert(t("alertSignInFirst"));
       return;
     }
 
     const btn = el("btnSendInvite");
     btn.disabled = true;
-    btn.textContent = "Sending...";
+    btn.textContent = t("referralSending");
 
     try {
       const response = await fetch("/api/referrals", {
@@ -2405,18 +2842,18 @@ const setupEvents = () => {
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
-        alert(data.error || data.hint || "Could not send invite.");
+        alert(data.error || data.hint || t("alertCouldNotSendInvite"));
       } else {
         el("referInviteEmail").value = "";
         await Promise.all([fetchReferralData(), fetchNotificationsFromDB()]);
-        alert("Invite sent.");
+        alert(t("referralInviteSent"));
       }
     } catch (err) {
       console.error("Referral invite failed:", err);
-      alert("Could not send invite.");
+      alert(t("alertCouldNotSendInvite"));
     } finally {
       btn.disabled = false;
-      btn.textContent = "Send invite";
+      btn.textContent = t("btnSendInvite");
     }
   });
 
@@ -2424,7 +2861,7 @@ const setupEvents = () => {
     chip.addEventListener("click", () => {
       document.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
       chip.classList.add("active");
-      el("feedbackMessage").value = chip.dataset.topic + ": ";
+      el("feedbackMessage").value = `${chip.textContent}: `;
     });
   });
 
@@ -2432,18 +2869,18 @@ const setupEvents = () => {
     const email = el("feedbackEmail").value.trim();
     const message = el("feedbackMessage").value.trim();
     if (!email) {
-      alert("Please enter your email.");
+      alert(t("alertEnterEmail"));
       return;
     }
     if (!message) {
-      alert("Please enter a message.");
+      alert(t("alertEnterMessage"));
       return;
     }
     el("feedbackEmail").value = "";
     el("feedbackMessage").value = "";
     document.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
     el("feedbackModal").classList.add("hidden");
-    alert("Thanks for your feedback! We'll get back to you soon.");
+    alert(t("alertFeedbackThanks"));
   });
 
   el("orderSearch").addEventListener("input", () => renderOrders());
@@ -2646,7 +3083,7 @@ const init = async () => {
   renderNotifications();
   setupEvents();
   setLoginChallengeActive(false);
-  setLoginControlsDisabled(true, t("btnSigning"));
+  setLoginControlsDisabled(true, t("statusSigningIn"));
   applyLanguage();
 
   const authToken = getAuthTokenFromUrl();

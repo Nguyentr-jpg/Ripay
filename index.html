@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260218-1" />
+    <link rel="stylesheet" href="styles.css?v=20260219-2" />
   </head>
   <body>
     <div id="app">
@@ -142,19 +142,19 @@
                 <div class="order-filter">
                   <input id="orderSearch" type="text" placeholder="Search orders by name, ID, or client..." />
                   <select id="orderStatusFilter">
-                    <option value="all">All statuses</option>
-                    <option value="unpaid">Unpaid</option>
-                    <option value="paid">Paid</option>
+                    <option id="statusOptionAll" value="all">All statuses</option>
+                    <option id="statusOptionUnpaid" value="unpaid">Unpaid</option>
+                    <option id="statusOptionPaid" value="paid">Paid</option>
                   </select>
                 </div>
                 <div class="order-table">
                   <div class="order-row order-header">
                     <div></div>
-                    <div>Order name</div>
-                    <div>Order ID</div>
-                    <div>Client ID</div>
-                    <div>Quantity</div>
-                    <div>Status</div>
+                    <div id="orderHeadName">Order name</div>
+                    <div id="orderHeadId">Order ID</div>
+                    <div id="orderHeadClientId">Client ID</div>
+                    <div id="orderHeadQty">Quantity</div>
+                    <div id="orderHeadStatus">Status</div>
                     <div></div>
                   </div>
                   <div id="orderList"></div>
@@ -236,19 +236,19 @@
       <div class="modal-content">
         <div class="modal-head">
           <div>
-            <h3>Pay for orders</h3>
-            <div class="modal-sub">Leaf credits balance</div>
+            <h3 id="payModalTitle">Pay for orders</h3>
+            <div id="payModalSub" class="modal-sub">Leaf credits balance</div>
           </div>
           <button id="btnClosePay" class="btn ghost">Close</button>
         </div>
         <div class="pay-grid">
           <label class="field">
-            <span>Payment method</span>
-            <input type="text" value="Leaf credits" disabled />
+            <span id="payMethodLabel">Payment method</span>
+            <input id="payMethodValue" type="text" value="Leaf credits" disabled />
           </label>
           <label class="field">
-            <span>Rate</span>
-            <input type="text" value="1 Leaf = $1.00 USD" disabled />
+            <span id="payRateLabel">Rate</span>
+            <input id="payRateValue" type="text" value="1 Leaf = $1.00 USD" disabled />
           </label>
         </div>
         <div id="payTotal" class="pay-total"></div>
@@ -265,13 +265,13 @@
       <div class="modal-content">
         <div class="modal-head">
           <div>
-            <h3>Top up Leaf</h3>
-            <div class="modal-sub">PayPal Sandbox checkout (1 Leaf = $1 USD)</div>
+            <h3 id="topupTitle">Top up Leaf</h3>
+            <div id="topupSub" class="modal-sub">PayPal Sandbox checkout (1 Leaf = $1 USD)</div>
           </div>
           <button id="btnCloseTopup" class="btn ghost">Close</button>
         </div>
         <label class="field">
-          <span>Leaf amount</span>
+          <span id="leafAmountLabel">Leaf amount</span>
           <input id="leafTopupAmount" type="number" min="1" step="0.01" value="20" />
         </label>
         <div id="leafTopupSummary" class="pay-total"></div>
@@ -297,43 +297,43 @@
       <div class="modal-content">
         <div class="modal-head">
           <div>
-            <h3>Upgrade plan</h3>
-            <div class="modal-sub">Choose Free, Personal, or Business for your workspace.</div>
+            <h3 id="upgradeTitle">Upgrade plan</h3>
+            <div id="upgradeSub" class="modal-sub">Choose Free, Personal, or Business for your workspace.</div>
           </div>
           <button id="btnCloseSub" class="btn ghost">Close</button>
         </div>
         <div class="upgrade-cycle">
-          <button class="cycle-btn active" data-cycle="monthly">Monthly billing</button>
-          <button class="cycle-btn" data-cycle="annual">Annual billing</button>
+          <button id="cycleMonthly" class="cycle-btn active" data-cycle="monthly">Monthly billing</button>
+          <button id="cycleAnnual" class="cycle-btn" data-cycle="annual">Annual billing</button>
         </div>
         <div class="plan-grid upgrade-plan-grid">
           <button class="plan-card upgrade-plan-card active" data-tier="free">
-            <div class="plan-title">Free</div>
-            <div class="plan-price">$0 / month</div>
-            <div class="plan-note">2 orders/day, max 10 orders/week</div>
+            <div id="planFreeTitle" class="plan-title">Free</div>
+            <div id="planFreePrice" class="plan-price">$0 / month</div>
+            <div id="planFreeNote" class="plan-note">2 orders/day, max 10 orders/week</div>
             <ul class="plan-list">
-              <li>Storage: 12 hours</li>
-              <li>1 account</li>
+              <li id="planFreeItem1">Storage: 12 hours</li>
+              <li id="planFreeItem2">1 account</li>
             </ul>
           </button>
           <button class="plan-card upgrade-plan-card" data-tier="personal">
-            <div class="plan-title">Personal</div>
+            <div id="planPersonalTitle" class="plan-title">Personal</div>
             <div class="plan-price">$39 / month</div>
-            <div class="plan-note">Unlimited orders</div>
+            <div id="planPersonalNote" class="plan-note">Unlimited orders</div>
             <ul class="plan-list">
-              <li>Order email notifications</li>
-              <li>Storage: 7 days</li>
-              <li>1 account</li>
+              <li id="planPersonalItem1">Order email notifications</li>
+              <li id="planPersonalItem2">Storage: 7 days</li>
+              <li id="planPersonalItem3">1 account</li>
             </ul>
           </button>
           <button class="plan-card upgrade-plan-card" data-tier="business">
-            <div class="plan-title">Business</div>
+            <div id="planBusinessTitle" class="plan-title">Business</div>
             <div class="plan-price">$99 / month</div>
-            <div class="plan-note">Unlimited orders</div>
+            <div id="planBusinessNote" class="plan-note">Unlimited orders</div>
             <ul class="plan-list">
-              <li>Order email notifications</li>
-              <li>Storage: 2 months</li>
-              <li>3 accounts included</li>
+              <li id="planBusinessItem1">Order email notifications</li>
+              <li id="planBusinessItem2">Storage: 2 months</li>
+              <li id="planBusinessItem3">3 accounts included</li>
             </ul>
           </button>
         </div>
@@ -347,14 +347,14 @@
       <div class="modal-content refer-modal-content">
         <div class="modal-head">
           <div>
-            <h3>Refer and earn</h3>
-            <div class="modal-sub">Invite by email. Once they subscribe, both receive 1 free month.</div>
+            <h3 id="referTitle">Refer and earn</h3>
+            <div id="referSub" class="modal-sub">Invite by email. Once they subscribe, both receive 1 free month.</div>
           </div>
           <button id="btnCloseRefer" class="btn ghost">Close</button>
         </div>
         <div class="refer-grid">
           <label class="field">
-            <span>Invite email</span>
+            <span id="referEmailLabel">Invite email</span>
             <input id="referInviteEmail" type="email" placeholder="friend@email.com" />
           </label>
           <button id="btnSendInvite" class="btn primary">Send invite</button>
@@ -368,13 +368,13 @@
       <div class="modal-content" style="max-width: 480px;">
         <div class="modal-head">
           <div>
-            <h3>Add client ID</h3>
-            <div class="modal-sub">Create a new client ID and use it for this row.</div>
+            <h3 id="clientIdModalTitle">Add client ID</h3>
+            <div id="clientIdModalSub" class="modal-sub">Create a new client ID and use it for this row.</div>
           </div>
           <button id="btnCloseClientIdModal" class="btn ghost">Close</button>
         </div>
         <label class="field">
-          <span>Client ID</span>
+          <span id="clientIdModalLabel">Client ID</span>
           <input id="newClientIdInput" type="text" placeholder="CLI-12345" />
         </label>
         <div class="modal-actions">
@@ -387,24 +387,24 @@
       <div class="modal-content">
         <div class="modal-head">
           <div>
-            <h3>Feedback</h3>
-            <div class="modal-sub">Tell us what you need and we will respond by email.</div>
+            <h3 id="feedbackModalTitle">Feedback</h3>
+            <div id="feedbackModalSub" class="modal-sub">Tell us what you need and we will respond by email.</div>
           </div>
           <button id="btnCloseFeedback" class="btn ghost">Close</button>
         </div>
         <div class="feedback-options">
-          <button class="chip" data-topic="Payment issue">Payment issue</button>
-          <button class="chip" data-topic="Download issue">Download issue</button>
-          <button class="chip" data-topic="Request features">Request features</button>
-          <button class="chip" data-topic="Other">Other</button>
+          <button id="chipPaymentIssue" class="chip" data-topic="Payment issue">Payment issue</button>
+          <button id="chipDownloadIssue" class="chip" data-topic="Download issue">Download issue</button>
+          <button id="chipRequestFeatures" class="chip" data-topic="Request features">Request features</button>
+          <button id="chipOther" class="chip" data-topic="Other">Other</button>
         </div>
         <div class="feedback-grid">
           <label class="field">
-            <span>Email</span>
+            <span id="feedbackEmailLabel">Email</span>
             <input id="feedbackEmail" type="email" placeholder="name@email.com" />
           </label>
           <label class="field">
-            <span>Message</span>
+            <span id="feedbackMessageLabel">Message</span>
             <textarea id="feedbackMessage" rows="4" placeholder="Tell us what you need"></textarea>
           </label>
         </div>
@@ -414,6 +414,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=20260218-1"></script>
+    <script src="app.js?v=20260219-2"></script>
   </body>
 </html>
