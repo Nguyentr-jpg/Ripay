@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260219-6" />
+    <link rel="stylesheet" href="styles.css?v=20260219-7" />
   </head>
   <body>
     <div id="app">
@@ -306,6 +306,10 @@
           <button id="cycleMonthly" class="cycle-btn active" data-cycle="monthly">Monthly billing</button>
           <button id="cycleAnnual" class="cycle-btn" data-cycle="annual">Annual billing</button>
         </div>
+        <div class="upgrade-current-plan">
+          <span id="currentPlanLabel">Current plan:</span>
+          <strong id="currentPlanValue">Free</strong>
+        </div>
         <div class="plan-grid upgrade-plan-grid">
           <button class="plan-card upgrade-plan-card active" data-tier="free">
             <div id="planFreeTitle" class="plan-title">Free</div>
@@ -418,6 +422,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=20260219-6"></script>
+    <script src="app.js?v=20260219-7"></script>
   </body>
 </html>

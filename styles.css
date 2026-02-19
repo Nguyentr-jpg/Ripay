@@ -927,6 +927,15 @@ main {
   margin-bottom: 12px;
 }
 
+.upgrade-current-plan {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff8f2;
+  font-size: 14px;
+}
+
 .cycle-btn {
   border: 1px solid var(--border);
   border-radius: 10px;

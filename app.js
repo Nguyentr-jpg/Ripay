@@ -49,6 +49,7 @@ const state = {
     unread: 0,
     open: false,
   },
+  currentPlanCode: "free",
   userMenuOpen: false,
   lang: "en",
 };
@@ -162,6 +163,7 @@ const I18N = {
     topupSummaryLine: "Top-up amount: {amount} = {leaf} Leaf",
     upgradeTitle: "Upgrade plan",
     upgradeSub: "Choose Free, Personal, or Business for your workspace.",
+    currentPlanLabel: "Current plan:",
     cycleMonthly: "Monthly billing",
     cycleAnnual: "Annual billing",
     planFreeTitle: "Free",
@@ -404,6 +406,7 @@ const I18N = {
     topupSummaryLine: "Số nạp: {amount} = {leaf} Leaf",
     upgradeTitle: "Nâng cấp gói",
     upgradeSub: "Chọn Free, Personal hoặc Business cho workspace.",
+    currentPlanLabel: "Gói hiện tại:",
     cycleMonthly: "Thanh toán theo tháng",
     cycleAnnual: "Thanh toán theo năm",
     planFreeTitle: "Free",
@@ -646,6 +649,7 @@ const applyLanguage = () => {
   setText("leafAmountLabel", "leafAmountLabel");
   setText("upgradeTitle", "upgradeTitle");
   setText("upgradeSub", "upgradeSub");
+  setText("currentPlanLabel", "currentPlanLabel");
   setText("cycleMonthly", "cycleMonthly");
   setText("cycleAnnual", "cycleAnnual");
   setText("planFreeTitle", "planFreeTitle");
@@ -764,6 +768,7 @@ const applyLanguage = () => {
   updateUpgradePricing();
   setLoginChallengeActive(!el("loginCodePanel").classList.contains("hidden"));
   updatePlanBadge();
+  updateCurrentPlanDisplay();
   renderOrders();
   renderPayments();
   renderNotifications();
@@ -837,6 +842,7 @@ const loadState = () => {
     state.payments = data.payments || [];
     state.subscribed = Boolean(data.subscribed);
     state.planTier = data.planTier || "free";
+    state.currentPlanCode = data.currentPlanCode || state.planTier || "free";
     state.leafBalance = Number(data.leafBalance || 0);
   } catch (err) {
     console.error(err);
@@ -863,6 +869,7 @@ const saveState = () => {
     payments: state.payments,
     subscribed: state.subscribed,
     planTier: state.planTier,
+    currentPlanCode: state.currentPlanCode,
     leafBalance: state.leafBalance,
   };
 
@@ -896,6 +903,43 @@ const getPlanLabel = (tier) => {
   if (tier === "business") return t("planNameBusiness");
   if (tier === "personal") return t("planNamePersonal");
   return t("planNameFree");
+};
+
+const parseSubscriptionPlan = (planCode, fallbackTier = "free") => {
+  const raw = String(planCode || "").trim().toLowerCase();
+  if (!raw) {
+    return {
+      tier: fallbackTier || "free",
+      cycle: "monthly",
+    };
+  }
+  const [tierPart, cyclePart] = raw.split("_");
+  const tier = ["free", "personal", "business"].includes(tierPart) ? tierPart : fallbackTier || "free";
+  const cycle = cyclePart === "annual" ? "annual" : "monthly";
+  return { tier, cycle };
+};
+
+const updateCurrentPlanDisplay = () => {
+  const node = el("currentPlanValue");
+  if (!node) return;
+  const parsed = parseSubscriptionPlan(state.currentPlanCode, state.planTier);
+  const planLabel = getPlanLabel(parsed.tier);
+  if (parsed.tier === "free") {
+    node.textContent = planLabel;
+    return;
+  }
+  node.textContent = `${planLabel} (${parsed.cycle === "annual" ? t("cycleAnnual") : t("cycleMonthly")})`;
+};
+
+const syncUpgradeSelectionFromCurrentPlan = () => {
+  const parsed = parseSubscriptionPlan(state.currentPlanCode, state.planTier);
+  document.querySelectorAll(".upgrade-plan-card").forEach((card) => {
+    card.classList.toggle("active", card.dataset.tier === parsed.tier);
+  });
+  const preferredCycle = parsed.cycle === "annual" ? "annual" : "monthly";
+  document.querySelectorAll(".cycle-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.cycle === preferredCycle);
+  });
 };
 
 const formatRetention = (hours) => {
@@ -1787,9 +1831,13 @@ const fetchSubscriptionStatus = async () => {
     }
     state.subscribed = Boolean(data.subscription);
     state.planTier = data.tier || (data.subscription ? "personal" : "free");
+    state.currentPlanCode = data.subscription && data.subscription.plan
+      ? String(data.subscription.plan)
+      : String(state.planTier || "free");
     state.planFeatures = data.planFeatures || null;
     state.usage = data.usage || { ordersToday: 0, ordersThisWeek: 0 };
     updatePlanBadge();
+    updateCurrentPlanDisplay();
     saveState();
     renderStats();
   } catch (err) {
@@ -2099,6 +2147,7 @@ const renderPayPalSubscriptionButton = async () => {
 
         state.subscribed = true;
         state.planTier = tier;
+        state.currentPlanCode = `${tier}_${billingCycle}`;
         saveState();
         closeSubscriptionModal();
         await Promise.all([fetchSubscriptionStatus(), fetchReferralData(), fetchNotificationsFromDB()]);
@@ -2124,9 +2173,9 @@ const renderPayPalSubscriptionButton = async () => {
 };
 
 const openSubscriptionModal = async () => {
-  document.querySelectorAll(".upgrade-plan-card").forEach((card) => {
-    card.classList.toggle("active", card.dataset.tier === state.planTier);
-  });
+  await fetchSubscriptionStatus();
+  syncUpgradeSelectionFromCurrentPlan();
+  updateCurrentPlanDisplay();
   updateUpgradePricing();
   el("subModal").classList.remove("hidden");
   await renderPayPalSubscriptionButton();
@@ -2568,6 +2617,10 @@ const applyAuthenticatedSession = async (data) => {
   state.user = data.user;
   state.subscribed = Boolean(data.subscription);
   state.planTier = data.tier || (data.subscription ? "personal" : "free");
+  state.currentPlanCode =
+    data.subscription && data.subscription.plan
+      ? String(data.subscription.plan)
+      : String(state.planTier || "free");
   state.planFeatures = data.planFeatures || null;
   state.usage = data.usage || { ordersToday: 0, ordersThisWeek: 0 };
   showApp(data.user);
@@ -2586,6 +2639,7 @@ const clearClientSessionState = () => {
   state.customClientIds = [];
   state.subscribed = false;
   state.planTier = "free";
+  state.currentPlanCode = "free";
   state.planFeatures = null;
   state.usage = { ordersToday: 0, ordersThisWeek: 0 };
   state.referral = { stats: { total: 0, pending: 0, rewarded: 0 }, invites: [] };
