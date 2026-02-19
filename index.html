@@ -19,7 +19,7 @@
           <div class="logo">re</div>
           <div>
             <div class="name">renpay</div>
-            <div class="tag">Payments & downloads for real estate media editing</div>
+            <div id="appTagline" class="tag">Payments & downloads for real estate media editing</div>
           </div>
         </div>
         <div class="topbar-right">
@@ -29,7 +29,7 @@
               <span id="notifCount" class="notif-count hidden">0</span>
             </button>
             <div id="notifPanel" class="notif-panel hidden">
-              <div class="notif-head">Notifications</div>
+              <div id="notifHead" class="notif-head">Notifications</div>
               <div id="notifList" class="notif-list"></div>
             </div>
           </div>
@@ -41,17 +41,17 @@
         <section id="loginScreen" class="screen">
           <div class="hero">
             <div class="hero-left">
-              <h1>Fast payments, safe downloads</h1>
-              <p>
+              <h1 id="heroTitle">Fast payments, safe downloads</h1>
+              <p id="heroSubtitle">
                 Built for real estate photo, video, and floor plan editing. Manage orders, collect
                 card payments, and deliver watermarked previews in one place.
               </p>
-              <div class="pill">Payment gateway: PayPal + Leaf credits</div>
+              <div id="paymentGatewayPill" class="pill">Payment gateway: PayPal + Leaf credits</div>
               <div class="login-card">
-                <h2>Sign in</h2>
-                <p>Enter your email to continue.</p>
+                <h2 id="loginTitle">Sign in</h2>
+                <p id="loginSubtitle">Enter your email to continue.</p>
                 <label class="field">
-                  <span>Email</span>
+                  <span id="loginEmailLabel">Email</span>
                   <input id="loginEmail" type="email" placeholder="name@email.com" />
                 </label>
                 <button id="btnLogin" class="btn primary">Sign in</button>
@@ -60,7 +60,7 @@
                     Check your email and click the link to sign in automatically, or enter the 6-digit code below.
                   </div>
                   <label class="field">
-                    <span>Sign-in code</span>
+                    <span id="loginCodeLabel">Sign-in code</span>
                     <input
                       id="loginCode"
                       type="text"
@@ -71,12 +71,12 @@
                   </label>
                   <button id="btnLoginCode" class="btn ghost">Sign in with code</button>
                 </div>
-                <div class="hint">Free plan: 2 orders/day and up to 10 orders/week.</div>
+                <div id="loginPlanHint" class="hint">Free plan: 2 orders/day and up to 10 orders/week.</div>
               </div>
             </div>
             <div class="hero-right">
               <div class="preview-card">
-                <div class="preview-head">Watermarked preview gallery</div>
+                <div id="previewHead" class="preview-head">Watermarked preview gallery</div>
                 <div class="preview-grid">
                   <div class="preview-img"><span>RENPAY PREVIEW</span></div>
                   <div class="preview-img"><span>RENPAY PREVIEW</span></div>
@@ -87,11 +87,11 @@
               <div class="stats">
                 <div>
                   <div class="stat-num">2,840+</div>
-                  <div class="stat-label">Orders processed</div>
+                  <div id="heroStatOrdersLabel" class="stat-label">Orders processed</div>
                 </div>
                 <div>
                   <div class="stat-num">98.7%</div>
-                  <div class="stat-label">Successful payments</div>
+                  <div id="heroStatSuccessLabel" class="stat-label">Successful payments</div>
                 </div>
               </div>
             </div>
@@ -109,17 +109,17 @@
                 </div>
               </div>
               <nav class="nav">
-                <button class="nav-item active" data-tab="overview">Overview</button>
-                <button class="nav-item" data-tab="create">Create Order</button>
-                <button class="nav-item" data-tab="payments">Payments</button>
+                <button id="navOverview" class="nav-item active" data-tab="overview">Overview</button>
+                <button id="navCreate" class="nav-item" data-tab="create">Create Order</button>
+                <button id="navPayments" class="nav-item" data-tab="payments">Payments</button>
               </nav>
               <div class="side-actions">
                 <button id="btnOpenRefer" class="btn ghost side-btn">Refer and earn</button>
                 <button id="btnOpenUpgrade" class="btn side-upgrade-btn">Upgrade</button>
               </div>
               <div class="support">
-                <div class="support-title">Feedback</div>
-                <div class="support-text">Share a quick note or request.</div>
+                <div id="feedbackTitle" class="support-title">Feedback</div>
+                <div id="feedbackSubtitle" class="support-text">Share a quick note or request.</div>
                 <button id="btnOpenFeedback" class="btn ghost">Open feedback form</button>
                 <button id="btnLogout" class="btn ghost">Sign out</button>
               </div>
@@ -129,8 +129,8 @@
               <div id="tab-overview" class="tab active">
                 <div class="tab-head">
                   <div>
-                    <h2>Overview</h2>
-                    <p>All orders waiting for payment or already paid.</p>
+                    <h2 id="overviewTitle">Overview</h2>
+                    <p id="overviewSubtitle">All orders waiting for payment or already paid.</p>
                   </div>
                   <div class="tab-head-actions">
                     <button id="btnTopupLeaf" class="btn ghost">Top up Leaf</button>
@@ -164,13 +164,13 @@
               <div id="tab-create" class="tab">
                 <div class="tab-head">
                   <div>
-                    <h2>Create Order</h2>
-                    <p>Create one or multiple orders at once.</p>
+                    <h2 id="createOrderTitle">Create Order</h2>
+                    <p id="createOrderSubtitle">Create one or multiple orders at once.</p>
                   </div>
                 </div>
                 <div class="form-card">
                   <div class="field">
-                    <span>Order name</span>
+                    <span id="createOrderNameLabel">Order name</span>
                     <datalist id="clientIdOptions"></datalist>
                     <div id="lineItems"></div>
                     <button id="btnAddLine" class="btn ghost">+ Add order</button>
@@ -185,18 +185,18 @@
               <div id="tab-payments" class="tab">
                 <div class="tab-head">
                   <div>
-                    <h2>Leaf Wallet</h2>
-                    <p>Top-ups and order payments from your Leaf balance.</p>
+                    <h2 id="walletTitle">Leaf Wallet</h2>
+                    <p id="walletSubtitle">Top-ups and order payments from your Leaf balance.</p>
                   </div>
                   <button id="btnExportPayments" class="btn ghost">Export CSV</button>
                 </div>
                 <div class="payment-table">
                   <div class="payment-row payment-header">
-                    <div>Date</div>
-                    <div>Type</div>
-                    <div>Description</div>
-                    <div>Amount</div>
-                    <div>Balance</div>
+                    <div id="paymentHeadDate">Date</div>
+                    <div id="paymentHeadType">Type</div>
+                    <div id="paymentHeadDesc">Description</div>
+                    <div id="paymentHeadAmount">Amount</div>
+                    <div id="paymentHeadBalance">Balance</div>
                   </div>
                   <div id="paymentList"></div>
                 </div>
@@ -205,6 +205,13 @@
           </div>
         </section>
       </main>
+      <footer class="lang-footer">
+        <label for="languageSelect" id="languageLabel">Language</label>
+        <select id="languageSelect">
+          <option value="en">English</option>
+          <option value="vi">Tiếng Việt</option>
+        </select>
+      </footer>
     </div>
 
     <div id="galleryModal" class="modal fullscreen hidden">

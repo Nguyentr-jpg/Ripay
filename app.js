@@ -1,5 +1,6 @@
 const STORAGE_KEY = "renpay-data-v1";
 const NOTIF_SEEN_AT_PREFIX = "renpay-notif-seen-at:";
+const LANG_KEY = "renpay-lang";
 
 const state = {
   user: null, // { id, email, name, role }
@@ -48,6 +49,7 @@ const state = {
     unread: 0,
     open: false,
   },
+  lang: "en",
 };
 
 const ADD_NEW_CLIENT_ID_OPTION = "+ Add new client id";
@@ -56,6 +58,277 @@ let activeClientIdInput = null;
 const el = (id) => document.getElementById(id);
 let paypalSdkPromise = null;
 let paypalSubSdkPromise = null;
+
+const I18N = {
+  en: {
+    appTagline: "Payments & downloads for real estate media editing",
+    notifHead: "Notifications",
+    heroTitle: "Fast payments, safe downloads",
+    heroSubtitle:
+      "Built for real estate photo, video, and floor plan editing. Manage orders, collect card payments, and deliver watermarked previews in one place.",
+    paymentGatewayPill: "Payment gateway: PayPal + Leaf credits",
+    previewHead: "Watermarked preview gallery",
+    heroStatOrdersLabel: "Orders processed",
+    heroStatSuccessLabel: "Successful payments",
+    loginTitle: "Sign in",
+    loginSubtitle: "Enter your email to continue.",
+    loginEmailLabel: "Email",
+    loginCodeLabel: "Sign-in code",
+    loginCodeHint:
+      "Check your email and click the link to sign in automatically, or enter the 6-digit code below.",
+    loginPlanHint: "Free plan: 2 orders/day and up to 10 orders/week.",
+    btnLogin: "Sign in",
+    btnLoginResend: "Resend sign-in link",
+    btnLoginCode: "Sign in with code",
+    btnSigning: "Signing...",
+    btnOpenRefer: "Refer and earn",
+    btnOpenUpgrade: "Upgrade",
+    feedbackTitle: "Feedback",
+    feedbackSubtitle: "Share a quick note or request.",
+    btnOpenFeedback: "Open feedback form",
+    btnLogout: "Sign out",
+    navOverview: "Overview",
+    navCreate: "Create Order",
+    navPayments: "Payments",
+    overviewTitle: "Overview",
+    overviewSubtitle: "All orders waiting for payment or already paid.",
+    btnTopupLeaf: "Top up Leaf",
+    btnExportOrders: "Export CSV",
+    btnBulkPay: "Pay selected orders",
+    btnExportPayments: "Export CSV",
+    orderSearchPlaceholder: "Search orders by name, ID, or client...",
+    statusAll: "All statuses",
+    statusUnpaid: "Unpaid",
+    statusPaid: "Paid",
+    orderHeadName: "Order name",
+    orderHeadId: "Order ID",
+    orderHeadClientId: "Client ID",
+    orderHeadQty: "Quantity",
+    orderHeadStatus: "Status",
+    createOrderTitle: "Create Order",
+    createOrderSubtitle: "Create one or multiple orders at once.",
+    createOrderNameLabel: "Order name",
+    btnAddLine: "+ Add order",
+    btnCreateApply: "Apply",
+    walletTitle: "Leaf Wallet",
+    walletSubtitle: "Top-ups and order payments from your Leaf balance.",
+    paymentHeadDate: "Date",
+    paymentHeadType: "Type",
+    paymentHeadDesc: "Description",
+    paymentHeadAmount: "Amount",
+    paymentHeadBalance: "Balance",
+    languageLabel: "Language",
+    statsTotalOrders: "Total orders",
+    statsRevenueCollected: "Revenue collected",
+    statsUnpaidOrders: "Unpaid orders",
+    statsPendingAmount: "Pending amount",
+    statsLeafBalance: "Leaf balance",
+    paid: "Paid",
+    unpaid: "Unpaid",
+    view: "View",
+    noOrdersFound: "No orders found.",
+    noWalletActivity: "No wallet activity yet.",
+    lineItemTypePlaceholder: "Order name (address + service)",
+    lineItemCountPlaceholder: "Quantity",
+    lineItemUnitPrice: "Unit price",
+    lineItemUnitPricePrompt: "Enter unit price (per photo/video)",
+    lineItemClientIdPlaceholder: "Client ID",
+    lineItemClientEmailPlaceholder: "Buyer email (optional)",
+    lineItemLinkPlaceholder: "Link",
+    notifNone: "No notifications yet.",
+    sellerPlan: "{plan} plan",
+  },
+  vi: {
+    appTagline: "Thanh toán & tải xuống cho chỉnh sửa media bất động sản",
+    notifHead: "Thông báo",
+    heroTitle: "Thanh toán nhanh, tải xuống an toàn",
+    heroSubtitle:
+      "Dành cho chỉnh sửa ảnh, video và mặt bằng bất động sản. Quản lý đơn hàng, thu tiền và giao bản xem trước có watermark tại một nơi.",
+    paymentGatewayPill: "Cổng thanh toán: PayPal + Leaf credits",
+    previewHead: "Thư viện xem trước có watermark",
+    heroStatOrdersLabel: "Đơn đã xử lý",
+    heroStatSuccessLabel: "Thanh toán thành công",
+    loginTitle: "Đăng nhập",
+    loginSubtitle: "Nhập email để tiếp tục.",
+    loginEmailLabel: "Email",
+    loginCodeLabel: "Mã đăng nhập",
+    loginCodeHint:
+      "Kiểm tra email và bấm liên kết để đăng nhập tự động, hoặc nhập mã 6 số bên dưới.",
+    loginPlanHint: "Gói miễn phí: 2 đơn/ngày và tối đa 10 đơn/tuần.",
+    btnLogin: "Đăng nhập",
+    btnLoginResend: "Gửi lại liên kết đăng nhập",
+    btnLoginCode: "Đăng nhập bằng mã",
+    btnSigning: "Đang đăng nhập...",
+    btnOpenRefer: "Giới thiệu nhận thưởng",
+    btnOpenUpgrade: "Nâng cấp",
+    feedbackTitle: "Phản hồi",
+    feedbackSubtitle: "Chia sẻ nhanh yêu cầu của bạn.",
+    btnOpenFeedback: "Mở form phản hồi",
+    btnLogout: "Đăng xuất",
+    navOverview: "Tổng quan",
+    navCreate: "Tạo đơn",
+    navPayments: "Thanh toán",
+    overviewTitle: "Tổng quan",
+    overviewSubtitle: "Tất cả đơn đang chờ thanh toán hoặc đã thanh toán.",
+    btnTopupLeaf: "Nạp Leaf",
+    btnExportOrders: "Xuất CSV",
+    btnBulkPay: "Thanh toán đơn đã chọn",
+    btnExportPayments: "Xuất CSV",
+    orderSearchPlaceholder: "Tìm theo tên đơn, ID hoặc khách hàng...",
+    statusAll: "Tất cả trạng thái",
+    statusUnpaid: "Chưa thanh toán",
+    statusPaid: "Đã thanh toán",
+    orderHeadName: "Tên đơn",
+    orderHeadId: "Mã đơn",
+    orderHeadClientId: "Mã khách",
+    orderHeadQty: "Số lượng",
+    orderHeadStatus: "Trạng thái",
+    createOrderTitle: "Tạo đơn",
+    createOrderSubtitle: "Tạo một hoặc nhiều đơn cùng lúc.",
+    createOrderNameLabel: "Tên đơn",
+    btnAddLine: "+ Thêm đơn",
+    btnCreateApply: "Áp dụng",
+    walletTitle: "Ví Leaf",
+    walletSubtitle: "Nạp tiền và thanh toán đơn bằng số dư Leaf.",
+    paymentHeadDate: "Ngày",
+    paymentHeadType: "Loại",
+    paymentHeadDesc: "Mô tả",
+    paymentHeadAmount: "Số tiền",
+    paymentHeadBalance: "Số dư",
+    languageLabel: "Ngôn ngữ",
+    statsTotalOrders: "Tổng đơn",
+    statsRevenueCollected: "Doanh thu",
+    statsUnpaidOrders: "Đơn chưa thanh toán",
+    statsPendingAmount: "Số tiền chờ",
+    statsLeafBalance: "Số dư Leaf",
+    paid: "Đã thanh toán",
+    unpaid: "Chưa thanh toán",
+    view: "Xem",
+    noOrdersFound: "Không có đơn hàng.",
+    noWalletActivity: "Chưa có hoạt động ví.",
+    lineItemTypePlaceholder: "Tên đơn (địa chỉ + dịch vụ)",
+    lineItemCountPlaceholder: "Số lượng",
+    lineItemUnitPrice: "Đơn giá",
+    lineItemUnitPricePrompt: "Nhập đơn giá (mỗi ảnh/video)",
+    lineItemClientIdPlaceholder: "Mã khách hàng",
+    lineItemClientEmailPlaceholder: "Email người mua (không bắt buộc)",
+    lineItemLinkPlaceholder: "Liên kết",
+    notifNone: "Chưa có thông báo.",
+    sellerPlan: "Gói {plan}",
+  },
+};
+
+const t = (key, params = {}) => {
+  const table = I18N[state.lang] || I18N.en;
+  const fallback = I18N.en[key] || key;
+  let value = table[key] || fallback;
+  Object.keys(params).forEach((name) => {
+    value = value.replaceAll(`{${name}}`, String(params[name]));
+  });
+  return value;
+};
+
+const loadLanguage = () => {
+  const saved = String(localStorage.getItem(LANG_KEY) || "").trim().toLowerCase();
+  if (saved === "vi" || saved === "en") {
+    state.lang = saved;
+    return;
+  }
+  const browserLang = String(navigator.language || "").toLowerCase();
+  state.lang = browserLang.startsWith("vi") ? "vi" : "en";
+};
+
+const setLanguage = (lang) => {
+  state.lang = lang === "vi" ? "vi" : "en";
+  localStorage.setItem(LANG_KEY, state.lang);
+  applyLanguage();
+};
+
+const applyLanguage = () => {
+  document.documentElement.lang = state.lang === "vi" ? "vi" : "en";
+
+  const setText = (id, key, params) => {
+    const node = el(id);
+    if (node) node.textContent = t(key, params);
+  };
+
+  setText("appTagline", "appTagline");
+  setText("notifHead", "notifHead");
+  setText("heroTitle", "heroTitle");
+  setText("heroSubtitle", "heroSubtitle");
+  setText("paymentGatewayPill", "paymentGatewayPill");
+  setText("previewHead", "previewHead");
+  setText("heroStatOrdersLabel", "heroStatOrdersLabel");
+  setText("heroStatSuccessLabel", "heroStatSuccessLabel");
+  setText("loginTitle", "loginTitle");
+  setText("loginSubtitle", "loginSubtitle");
+  setText("loginEmailLabel", "loginEmailLabel");
+  setText("loginCodeLabel", "loginCodeLabel");
+  setText("loginCodeHint", "loginCodeHint");
+  setText("loginPlanHint", "loginPlanHint");
+  setText("btnLoginCode", "btnLoginCode");
+  setText("btnOpenRefer", "btnOpenRefer");
+  setText("btnOpenUpgrade", "btnOpenUpgrade");
+  setText("feedbackTitle", "feedbackTitle");
+  setText("feedbackSubtitle", "feedbackSubtitle");
+  setText("btnOpenFeedback", "btnOpenFeedback");
+  setText("btnLogout", "btnLogout");
+  setText("navOverview", "navOverview");
+  setText("navCreate", "navCreate");
+  setText("navPayments", "navPayments");
+  setText("overviewTitle", "overviewTitle");
+  setText("overviewSubtitle", "overviewSubtitle");
+  setText("btnTopupLeaf", "btnTopupLeaf");
+  setText("btnExportOrders", "btnExportOrders");
+  setText("btnBulkPay", "btnBulkPay");
+  setText("btnExportPayments", "btnExportPayments");
+  setText("createOrderTitle", "createOrderTitle");
+  setText("createOrderSubtitle", "createOrderSubtitle");
+  setText("createOrderNameLabel", "createOrderNameLabel");
+  setText("btnAddLine", "btnAddLine");
+  setText("btnCreate", "btnCreateApply");
+  setText("walletTitle", "walletTitle");
+  setText("walletSubtitle", "walletSubtitle");
+  setText("paymentHeadDate", "paymentHeadDate");
+  setText("paymentHeadType", "paymentHeadType");
+  setText("paymentHeadDesc", "paymentHeadDesc");
+  setText("paymentHeadAmount", "paymentHeadAmount");
+  setText("paymentHeadBalance", "paymentHeadBalance");
+  setText("languageLabel", "languageLabel");
+
+  const loginEmail = el("loginEmail");
+  if (loginEmail) loginEmail.placeholder = "name@email.com";
+  const orderSearch = el("orderSearch");
+  if (orderSearch) orderSearch.placeholder = t("orderSearchPlaceholder");
+
+  const statusFilter = el("orderStatusFilter");
+  if (statusFilter && statusFilter.options.length >= 3) {
+    statusFilter.options[0].text = t("statusAll");
+    statusFilter.options[1].text = t("statusUnpaid");
+    statusFilter.options[2].text = t("statusPaid");
+  }
+
+  const header = document.querySelector(".order-row.order-header");
+  if (header) {
+    const cols = header.querySelectorAll("div");
+    if (cols.length >= 7) {
+      cols[1].textContent = t("orderHeadName");
+      cols[2].textContent = t("orderHeadId");
+      cols[3].textContent = t("orderHeadClientId");
+      cols[4].textContent = t("orderHeadQty");
+      cols[5].textContent = t("orderHeadStatus");
+    }
+  }
+
+  const languageSelect = el("languageSelect");
+  if (languageSelect) languageSelect.value = state.lang;
+
+  setLoginChallengeActive(!el("loginCodePanel").classList.contains("hidden"));
+  updatePlanBadge();
+  renderOrders();
+  renderPayments();
+  renderNotifications();
+};
 
 const getFileNameFromUrl = (url) => {
   if (!url) return "";
@@ -175,7 +448,7 @@ const downloadCSV = (rows, filename) => {
 const formatStatus = (status) => {
   const isPaid = status === "paid";
   return `<span class="badge ${isPaid ? "paid" : "unpaid"}">${
-    isPaid ? "Paid" : "Unpaid"
+    isPaid ? t("paid") : t("unpaid")
   }</span>`;
 };
 
@@ -198,7 +471,7 @@ const updatePlanBadge = () => {
   const roleEl = el("sellerRole");
   if (!roleEl) return;
   const planLabel = getPlanLabel(state.planTier);
-  roleEl.textContent = `${planLabel} plan`;
+  roleEl.textContent = t("sellerPlan", { plan: planLabel });
 };
 
 const formatLedgerDate = (value) => {
@@ -241,7 +514,7 @@ const renderNotifications = () => {
   count.textContent = unread > 99 ? "99+" : String(unread);
 
   if (!items.length) {
-    list.innerHTML = `<div class="notif-item"><div class="notif-msg">No notifications yet.</div></div>`;
+    list.innerHTML = `<div class="notif-item"><div class="notif-msg">${t("notifNone")}</div></div>`;
     return;
   }
 
@@ -368,23 +641,23 @@ const renderStats = () => {
 
   row.innerHTML = `
     <div class="stat-card">
-      <div class="stat-label">Total orders</div>
+      <div class="stat-label">${t("statsTotalOrders")}</div>
       <div class="stat-value">${total}</div>
     </div>
     <div class="stat-card highlight">
-      <div class="stat-label">Revenue collected</div>
+      <div class="stat-label">${t("statsRevenueCollected")}</div>
       <div class="stat-value">$${revenue.toFixed(2)}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Unpaid orders</div>
+      <div class="stat-label">${t("statsUnpaidOrders")}</div>
       <div class="stat-value">${unpaid.length}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Pending amount</div>
+      <div class="stat-label">${t("statsPendingAmount")}</div>
       <div class="stat-value">$${pending.toFixed(2)}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Leaf balance</div>
+      <div class="stat-label">${t("statsLeafBalance")}</div>
       <div class="stat-value">${formatMoney(state.leafBalance)}</div>
     </div>
   `;
@@ -414,7 +687,7 @@ const renderOrders = () => {
   const filtered = getFilteredOrders();
 
   if (!filtered.length) {
-    list.innerHTML = `<div class="order-row"><div></div><div>No orders found.</div><div></div><div></div><div></div><div></div><div></div></div>`;
+    list.innerHTML = `<div class="order-row"><div></div><div>${t("noOrdersFound")}</div><div></div><div></div><div></div><div></div><div></div></div>`;
     return;
   }
 
@@ -436,7 +709,7 @@ const renderOrders = () => {
       <div>${order.totalCount}</div>
       <div>${formatStatus(order.status)}</div>
       <div>
-        <button class="btn ghost" data-view="${order.id}">View</button>
+        <button class="btn ghost" data-view="${order.id}">${t("view")}</button>
       </div>
     `;
 
@@ -449,7 +722,7 @@ const renderPayments = () => {
   list.innerHTML = "";
 
   if (!state.payments.length) {
-    list.innerHTML = `<div class="payment-row"><div>No wallet activity yet.</div><div></div><div></div><div></div><div></div></div>`;
+    list.innerHTML = `<div class="payment-row"><div>${t("noWalletActivity")}</div><div></div><div></div><div></div><div></div></div>`;
     return;
   }
 
@@ -498,22 +771,22 @@ const addLineItem = (
   row.className = "line-item";
   row.dataset.unitPrice = item.unitPrice || 0;
   row.innerHTML = `
-    <input data-field="type" type="text" placeholder="Order name (address + service)" value="${item.type}" />
+    <input data-field="type" type="text" placeholder="${t("lineItemTypePlaceholder")}" value="${item.type}" />
     <div class="quantity-wrap">
-      <input data-field="count" type="number" min="1" placeholder="Quantity" value="${item.count || ""}" />
+      <input data-field="count" type="number" min="1" placeholder="${t("lineItemCountPlaceholder")}" value="${item.count || ""}" />
       <button class="price-btn" data-price>...</button>
-      <div class="price-hint">Unit price: $<span>${Number(item.unitPrice || 0).toFixed(2)}</span></div>
+      <div class="price-hint">${t("lineItemUnitPrice")}: $<span>${Number(item.unitPrice || 0).toFixed(2)}</span></div>
     </div>
-    <input data-field="clientId" type="text" list="clientIdOptions" placeholder="Client ID" value="${item.clientId || ""}" />
-    <input data-field="clientEmail" type="email" placeholder="Buyer email (optional)" value="${item.clientEmail || ""}" />
-    <input data-field="link" type="text" placeholder="Link" value="${item.link}" />
+    <input data-field="clientId" type="text" list="clientIdOptions" placeholder="${t("lineItemClientIdPlaceholder")}" value="${item.clientId || ""}" />
+    <input data-field="clientEmail" type="email" placeholder="${t("lineItemClientEmailPlaceholder")}" value="${item.clientEmail || ""}" />
+    <input data-field="link" type="text" placeholder="${t("lineItemLinkPlaceholder")}" value="${item.link}" />
     <button class="btn ghost" data-remove>–</button>
   `;
 
   const priceEl = row.querySelector("[data-price]");
   priceEl.addEventListener("click", () => {
     const current = row.dataset.unitPrice || item.unitPrice || 0;
-    const next = prompt("Enter unit price (per photo/video)", current);
+    const next = prompt(t("lineItemUnitPricePrompt"), current);
     if (next === null) return;
     const value = Math.max(0, Number(next));
     row.dataset.unitPrice = value;
@@ -1800,7 +2073,7 @@ const verifyLoginCode = async () => {
 
   const btn = el("btnLoginCode");
   btn.disabled = true;
-  btn.textContent = "Signing in...";
+  btn.textContent = t("btnSigning");
 
   try {
     const response = await fetch("/api/auth", {
@@ -1821,7 +2094,7 @@ const verifyLoginCode = async () => {
     return false;
   } finally {
     btn.disabled = false;
-    btn.textContent = "Sign in with code";
+    btn.textContent = t("btnLoginCode");
   }
 };
 
@@ -1830,7 +2103,7 @@ const setLoginChallengeActive = (active) => {
   const loginBtn = el("btnLogin");
   if (!panel || !loginBtn) return;
   panel.classList.toggle("hidden", !active);
-  loginBtn.textContent = active ? "Resend sign-in link" : "Sign in";
+  loginBtn.textContent = active ? t("btnLoginResend") : t("btnLogin");
 };
 
 const setLoginControlsDisabled = (disabled, signInLabel) => {
@@ -1850,6 +2123,10 @@ const setLoginControlsDisabled = (disabled, signInLabel) => {
 };
 
 const setupEvents = () => {
+  el("languageSelect").addEventListener("change", (event) => {
+    setLanguage(event.target.value);
+  });
+
   el("btnLogin").addEventListener("click", async () => {
     // If session cookie is still valid (14-day remember login), sign in directly.
     const resumed = await restoreSession();
@@ -1863,7 +2140,7 @@ const setupEvents = () => {
 
     const btn = el("btnLogin");
     btn.disabled = true;
-    btn.textContent = "Signing...";
+    btn.textContent = t("btnSigning");
 
     try {
       const response = await fetch("/api/auth", {
@@ -1886,8 +2163,8 @@ const setupEvents = () => {
 
     btn.disabled = false;
     btn.textContent = el("loginCodePanel").classList.contains("hidden")
-      ? "Sign in"
-      : "Resend sign-in link";
+      ? t("btnLogin")
+      : t("btnLoginResend");
   });
 
   el("btnLoginCode").addEventListener("click", verifyLoginCode);
@@ -2360,6 +2637,7 @@ const restoreSession = async () => {
 };
 
 const init = async () => {
+  loadLanguage();
   // Don't load localStorage on init - we'll fetch from database instead
   // This prevents showing the wrong user's data
   renderOrders();
@@ -2368,7 +2646,8 @@ const init = async () => {
   renderNotifications();
   setupEvents();
   setLoginChallengeActive(false);
-  setLoginControlsDisabled(true, "Signing...");
+  setLoginControlsDisabled(true, t("btnSigning"));
+  applyLanguage();
 
   const authToken = getAuthTokenFromUrl();
   if (authToken) {
