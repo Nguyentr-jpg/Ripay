@@ -1049,6 +1049,55 @@ const getClientById = (clientId) => {
   };
 };
 
+const fetchClientProfilesFromDB = async () => {
+  const email = state.user && state.user.email;
+  if (!email) return;
+  try {
+    const response = await fetch(`/api/client-profiles?email=${encodeURIComponent(email)}`);
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      console.error("Client profiles API error:", data);
+      return;
+    }
+    state.customClientIds = Array.isArray(data.profiles)
+      ? data.profiles.map((profile) => ({
+          id: String(profile.clientId || "").trim(),
+          email: String(profile.clientEmail || "").trim().toLowerCase(),
+        }))
+      : [];
+    renderClientIdOptions();
+  } catch (err) {
+    console.error("Could not fetch client profiles:", err);
+  }
+};
+
+const upsertClientProfileToDB = async (clientId, clientEmail) => {
+  const email = state.user && state.user.email;
+  const safeClientId = String(clientId || "").trim();
+  const safeClientEmail = String(clientEmail || "").trim().toLowerCase();
+  if (!email || !safeClientId || !safeClientEmail) return false;
+  try {
+    const response = await fetch("/api/client-profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        clientId: safeClientId,
+        clientEmail: safeClientEmail,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      console.error("Upsert client profile API error:", data);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Could not upsert client profile:", err);
+    return false;
+  }
+};
+
 const getClientIdOptions = () => {
   const ids = new Set();
   (state.customClientIds || []).forEach((entry) => {
@@ -1107,7 +1156,7 @@ const openClientIdModal = (targetInput) => {
   idInput.focus();
 };
 
-const saveNewClientId = () => {
+const saveNewClientId = async () => {
   const value = String((el("newClientIdInput").value || "")).trim();
   const buyerEmail = String((el("newClientEmailInput").value || "")).trim().toLowerCase();
   if (!value) {
@@ -1127,6 +1176,7 @@ const saveNewClientId = () => {
     return;
   }
   rememberClientId(value, buyerEmail);
+  await upsertClientProfileToDB(value, buyerEmail);
   renderClientIdOptions();
   if (activeClientIdInput) {
     activeClientIdInput.value = value;
@@ -2380,6 +2430,7 @@ const createOrder = async () => {
     const buyerEmail = String(item.clientEmail || "").trim().toLowerCase();
     const fallbackEmail = (state.user && state.user.email) || "client@email.com";
     const clientName = buyerEmail || fallbackEmail;
+    await upsertClientProfileToDB(clientId, buyerEmail);
 
     // Fetch media files if link is provided
     let mediaFiles = null;
@@ -2521,8 +2572,7 @@ const applyAuthenticatedSession = async (data) => {
   state.usage = data.usage || { ordersToday: 0, ordersThisWeek: 0 };
   showApp(data.user);
 
-  await fetchOrdersFromDB();
-  await fetchWalletFromDB();
+  await Promise.all([fetchOrdersFromDB(), fetchWalletFromDB(), fetchClientProfilesFromDB()]);
   await Promise.all([fetchSubscriptionStatus(), fetchReferralData(), fetchNotificationsFromDB()]);
 
   return true;
@@ -3025,7 +3075,7 @@ const setupEvents = () => {
         o.id,
         `"${o.name}"`,
         o.clientId || "",
-        o.clientName || "",
+        o.clientEmail || o.clientName || "",
         o.totalCount,
         getOrderAmount(o).toFixed(2),
         o.status,
@@ -3061,9 +3111,9 @@ const syncLocalOrderToDB = async (order) => {
         totalCount: order.totalCount,
         totalAmount: getOrderAmount(order),
         clientId: order.clientId,
-        clientName: order.clientName || (state.user && state.user.email) || "client@email.com",
-        clientEmail: order.clientEmail || order.clientName || "",
-        userEmail: (state.user && state.user.email) || order.clientName || "client@email.com",
+        clientName: order.clientName || order.clientEmail || (state.user && state.user.email) || "client@email.com",
+        clientEmail: order.clientEmail || "",
+        userEmail: (state.user && state.user.email) || "client@email.com",
         items: order.items || [],
       }),
     });

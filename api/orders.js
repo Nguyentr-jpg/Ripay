@@ -176,6 +176,7 @@ async function handleGet(req, res) {
 
 async function handlePost(req, res) {
   const { orderName, totalCount, totalAmount, clientId, clientName, userEmail, items, clientEmail } = req.body;
+  const normalizedUserEmail = normalizeEmail(userEmail);
 
   if (!orderName || totalCount == null || totalAmount == null) {
     return res.status(400).json({
@@ -183,17 +184,17 @@ async function handlePost(req, res) {
     });
   }
 
-  if (!userEmail) {
+  if (!normalizedUserEmail) {
     return res.status(400).json({ error: "Missing required field: userEmail" });
   }
 
   // Find or create user by email
-  let user = await getPrisma().user.findUnique({ where: { email: userEmail } });
+  let user = await getPrisma().user.findUnique({ where: { email: normalizedUserEmail } });
   if (!user) {
     user = await getPrisma().user.create({
       data: {
-        email: userEmail,
-        name: userEmail.split("@")[0],
+        email: normalizedUserEmail,
+        name: normalizedUserEmail.split("@")[0],
       },
     });
   }
@@ -231,6 +232,7 @@ async function handlePost(req, res) {
 
   // Generate unique order number
   const orderNumber = `ORD-${Date.now()}`;
+  const normalizedClientEmail = normalizeEmail(clientEmail || clientName || "");
 
   // Create order with items in a transaction
   const order = await getPrisma().order.create({
@@ -241,7 +243,8 @@ async function handlePost(req, res) {
       totalAmount: String(Number(totalAmount).toFixed(2)),
       status: "UNPAID",
       clientId: clientId || `CLI-${Math.floor(Math.random() * 90000 + 10000)}`,
-      clientName: clientName || clientEmail || userEmail,
+      clientName: clientName || normalizedClientEmail || normalizedUserEmail,
+      clientEmail: normalizedClientEmail || null,
       userId: user.id,
       items: items && items.length > 0
         ? {
@@ -258,7 +261,7 @@ async function handlePost(req, res) {
     include: { items: true },
   });
 
-  const buyerEmail = normalizeEmail(clientEmail || clientName);
+  const buyerEmail = normalizedClientEmail;
   const canSendBuyerOrderEmail = ["personal", "business"].includes(planState.tier);
   if (canSendBuyerOrderEmail && buyerEmail && isValidEmail(buyerEmail)) {
     try {
@@ -273,6 +276,31 @@ async function handlePost(req, res) {
       });
     } catch (error) {
       console.error("Order created email send failed:", error);
+    }
+  }
+
+  if (order.clientId && normalizedClientEmail && isValidEmail(normalizedClientEmail)) {
+    try {
+      await getPrisma().clientProfile.upsert({
+        where: {
+          userId_clientId: {
+            userId: user.id,
+            clientId: order.clientId,
+          },
+        },
+        create: {
+          userId: user.id,
+          clientId: order.clientId,
+          clientEmail: normalizedClientEmail,
+          clientName: clientName || null,
+        },
+        update: {
+          clientEmail: normalizedClientEmail,
+          clientName: clientName || null,
+        },
+      });
+    } catch (error) {
+      console.error("Client profile upsert failed:", error);
     }
   }
 

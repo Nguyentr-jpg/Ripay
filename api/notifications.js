@@ -71,7 +71,7 @@ module.exports = async function handler(req, res) {
       }),
       db.order.findMany({
         where: {
-          clientName: email,
+          OR: [{ clientEmail: email }, { clientName: email }],
           userId: { not: user.id },
         },
         orderBy: { createdAt: "desc" },

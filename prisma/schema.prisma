@@ -66,6 +66,7 @@ model User {
   subscriptions   Subscription[]
   wallet          Wallet?
   walletLedgers   WalletLedger[]
+  clientProfiles  ClientProfile[]
   referralSent    ReferralInvite[] @relation("referral_sent")
   referralJoined  ReferralInvite[] @relation("referral_joined")
 
@@ -81,6 +82,7 @@ model Order {
   status        OrderStatus    @default(UNPAID)
   clientId      String?        @map("client_id") @db.VarChar(100)
   clientName    String?        @map("client_name") @db.VarChar(255)
+  clientEmail   String?        @map("client_email") @db.VarChar(255)
   userId        String         @map("user_id") @db.Uuid
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
@@ -92,6 +94,20 @@ model Order {
   walletLedgers WalletLedger[]
 
   @@map("orders")
+}
+
+model ClientProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId    String   @map("client_id") @db.VarChar(100)
+  clientEmail String   @map("client_email") @db.VarChar(255)
+  clientName  String?  @map("client_name") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([userId, clientId], map: "uq_client_profiles_user_client_id")
+  @@map("client_profiles")
 }
 
 model OrderItem {
