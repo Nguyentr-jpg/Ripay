@@ -561,7 +561,7 @@ main {
 
 .line-item {
   display: grid;
-  grid-template-columns: 1.25fr 0.85fr 0.75fr 1fr 1fr 80px;
+  grid-template-columns: 1.4fr 0.9fr 0.85fr 1fr 80px;
   gap: 10px;
   margin-bottom: 10px;
 }
@@ -1162,9 +1162,6 @@ main {
   .line-item > input[data-field="link"] {
     grid-column: span 2;
   }
-  .line-item > input[data-field="clientEmail"] {
-    grid-column: span 2;
-  }
 }
 
 @media (max-width: 700px) {
@@ -1175,8 +1172,7 @@ main {
     grid-template-columns: 1fr;
   }
   .line-item > input[data-field="type"],
-  .line-item > input[data-field="link"],
-  .line-item > input[data-field="clientEmail"] {
+  .line-item > input[data-field="link"] {
     grid-column: span 1;
   }
 }

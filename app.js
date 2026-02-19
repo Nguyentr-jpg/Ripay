@@ -192,8 +192,10 @@ const I18N = {
     referralInviteSent: "Invite sent.",
     referralSending: "Sending...",
     clientIdModalTitle: "Add client ID",
-    clientIdModalSub: "Create a new client ID and use it for this row.",
+    clientIdModalSub: "Create a client ID and optional buyer email for this row.",
     clientIdModalLabel: "Client ID",
+    clientIdEmailLabel: "Buyer email (optional)",
+    newClientEmailPlaceholder: "buyer@email.com",
     newClientIdPlaceholder: "CLI-12345",
     btnSave: "Save",
     feedbackModalTitle: "Feedback",
@@ -429,8 +431,10 @@ const I18N = {
     referralInviteSent: "Đã gửi lời mời.",
     referralSending: "Đang gửi...",
     clientIdModalTitle: "Thêm client ID",
-    clientIdModalSub: "Tạo client ID mới để dùng cho dòng này.",
+    clientIdModalSub: "Tạo client ID và email khách (không bắt buộc) cho dòng này.",
     clientIdModalLabel: "Client ID",
+    clientIdEmailLabel: "Email khách hàng (không bắt buộc)",
+    newClientEmailPlaceholder: "buyer@email.com",
     newClientIdPlaceholder: "CLI-12345",
     btnSave: "Lưu",
     feedbackModalTitle: "Phản hồi",
@@ -660,6 +664,7 @@ const applyLanguage = () => {
   setText("clientIdModalTitle", "clientIdModalTitle");
   setText("clientIdModalSub", "clientIdModalSub");
   setText("clientIdModalLabel", "clientIdModalLabel");
+  setText("clientIdEmailLabel", "clientIdEmailLabel");
   setText("btnSaveClientId", "btnSave");
   setText("feedbackModalTitle", "feedbackModalTitle");
   setText("feedbackModalSub", "feedbackModalSub");
@@ -687,6 +692,8 @@ const applyLanguage = () => {
   if (referInviteEmail) referInviteEmail.placeholder = t("referEmailPlaceholder");
   const newClientIdInput = el("newClientIdInput");
   if (newClientIdInput) newClientIdInput.placeholder = t("newClientIdPlaceholder");
+  const newClientEmailInput = el("newClientEmailInput");
+  if (newClientEmailInput) newClientEmailInput.placeholder = t("newClientEmailPlaceholder");
   const feedbackEmail = el("feedbackEmail");
   if (feedbackEmail) feedbackEmail.placeholder = "name@email.com";
   const feedbackMessage = el("feedbackMessage");
@@ -713,12 +720,10 @@ const applyLanguage = () => {
     const typeInput = row.querySelector('[data-field="type"]');
     const countInput = row.querySelector('[data-field="count"]');
     const clientIdInput = row.querySelector('[data-field="clientId"]');
-    const clientEmailInput = row.querySelector('[data-field="clientEmail"]');
     const linkInput = row.querySelector('[data-field="link"]');
     if (typeInput) typeInput.placeholder = t("lineItemTypePlaceholder");
     if (countInput) countInput.placeholder = t("lineItemCountPlaceholder");
     if (clientIdInput) clientIdInput.placeholder = t("lineItemClientIdPlaceholder");
-    if (clientEmailInput) clientEmailInput.placeholder = t("lineItemClientEmailPlaceholder");
     if (linkInput) linkInput.placeholder = t("lineItemLinkPlaceholder");
     const priceHint = row.querySelector(".price-hint");
     if (priceHint) {
@@ -1011,11 +1016,37 @@ const fetchNotificationsFromDB = async () => {
   }
 };
 
+const normalizeClientEntry = (entry) => {
+  if (!entry) return null;
+  if (typeof entry === "string") {
+    const id = entry.trim();
+    return id ? { id, email: "" } : null;
+  }
+  const id = String(entry.id || "").trim();
+  if (!id) return null;
+  return { id, email: String(entry.email || "").trim().toLowerCase() };
+};
+
+const getClientById = (clientId) => {
+  const id = String(clientId || "").trim();
+  if (!id) return null;
+  const custom = (state.customClientIds || [])
+    .map(normalizeClientEntry)
+    .find((entry) => entry && entry.id === id);
+  if (custom) return custom;
+  const fromOrders = (state.orders || []).find((order) => String(order.clientId || "").trim() === id);
+  if (!fromOrders) return null;
+  return {
+    id,
+    email: String((fromOrders.clientEmail || fromOrders.clientName || "")).trim().toLowerCase(),
+  };
+};
+
 const getClientIdOptions = () => {
   const ids = new Set();
-  (state.customClientIds || []).forEach((id) => {
-    const value = String(id || "").trim();
-    if (value) ids.add(value);
+  (state.customClientIds || []).forEach((entry) => {
+    const normalized = normalizeClientEntry(entry);
+    if (normalized && normalized.id) ids.add(normalized.id);
   });
   (state.orders || []).forEach((order) => {
     const value = String((order && order.clientId) || "").trim();
@@ -1032,29 +1063,46 @@ const renderClientIdOptions = () => {
   list.innerHTML = `${optionHtml}<option value="${getAddNewClientIdOption()}"></option>`;
 };
 
-const rememberClientId = (value) => {
+const rememberClientId = (value, email = "") => {
   const id = String(value || "").trim();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!id || isAddNewClientIdOption(id)) return;
   if (!Array.isArray(state.customClientIds)) state.customClientIds = [];
-  if (!state.customClientIds.includes(id)) {
-    state.customClientIds.push(id);
+  const existingIndex = state.customClientIds.findIndex((entry) => {
+    const normalized = normalizeClientEntry(entry);
+    return normalized && normalized.id === id;
+  });
+  if (existingIndex >= 0) {
+    const existing = normalizeClientEntry(state.customClientIds[existingIndex]);
+    state.customClientIds[existingIndex] = {
+      id,
+      email: normalizedEmail || (existing && existing.email) || "",
+    };
+    return;
   }
+  state.customClientIds.push({ id, email: normalizedEmail });
 };
 
 const closeClientIdModal = () => {
   el("clientIdModal").classList.add("hidden");
+  activeClientIdInput = null;
 };
 
 const openClientIdModal = (targetInput) => {
   activeClientIdInput = targetInput || null;
-  const input = el("newClientIdInput");
-  input.value = "";
+  const idInput = el("newClientIdInput");
+  const emailInput = el("newClientEmailInput");
+  const currentId = String((targetInput && targetInput.value) || "").trim();
+  const current = getClientById(currentId);
+  idInput.value = currentId;
+  emailInput.value = current && current.email ? current.email : "";
   el("clientIdModal").classList.remove("hidden");
-  input.focus();
+  idInput.focus();
 };
 
 const saveNewClientId = () => {
   const value = String((el("newClientIdInput").value || "")).trim();
+  const buyerEmail = String((el("newClientEmailInput").value || "")).trim().toLowerCase();
   if (!value) {
     alert(t("alertEnterClientId"));
     return;
@@ -1063,10 +1111,11 @@ const saveNewClientId = () => {
     alert(t("alertChooseAnotherClientId"));
     return;
   }
-  rememberClientId(value);
+  rememberClientId(value, buyerEmail);
   renderClientIdOptions();
   if (activeClientIdInput) {
     activeClientIdInput.value = value;
+    activeClientIdInput.dataset.clientEmail = buyerEmail;
   }
   closeClientIdModal();
 };
@@ -1203,9 +1252,7 @@ const renderLineItems = (items = []) => {
   data.forEach((item) => addLineItem(item));
 };
 
-const addLineItem = (
-  item = { type: "", count: 0, link: "", unitPrice: 0, clientId: "", clientEmail: "" }
-) => {
+const addLineItem = (item = { type: "", count: 0, link: "", unitPrice: 0, clientId: "" }) => {
   const container = el("lineItems");
   const row = document.createElement("div");
   row.className = "line-item";
@@ -1218,7 +1265,6 @@ const addLineItem = (
       <div class="price-hint">${t("lineItemUnitPrice")}: $<span>${Number(item.unitPrice || 0).toFixed(2)}</span></div>
     </div>
     <input data-field="clientId" type="text" list="clientIdOptions" placeholder="${t("lineItemClientIdPlaceholder")}" value="${item.clientId || ""}" />
-    <input data-field="clientEmail" type="email" placeholder="${t("lineItemClientEmailPlaceholder")}" value="${item.clientEmail || ""}" />
     <input data-field="link" type="text" placeholder="${t("lineItemLinkPlaceholder")}" value="${item.link}" />
     <button class="btn ghost" data-remove>–</button>
   `;
@@ -1238,6 +1284,12 @@ const addLineItem = (
   });
 
   const clientIdInput = row.querySelector('[data-field="clientId"]');
+  const existingClient = getClientById(item.clientId || "");
+  if (existingClient && existingClient.email) {
+    clientIdInput.dataset.clientEmail = existingClient.email;
+  } else if (item.clientEmail) {
+    clientIdInput.dataset.clientEmail = String(item.clientEmail).trim().toLowerCase();
+  }
   const handleClientIdInput = () => {
     const value = String((clientIdInput && clientIdInput.value) || "").trim();
     if (isAddNewClientIdOption(value)) {
@@ -1248,8 +1300,12 @@ const addLineItem = (
   const handleClientIdChange = () => {
     const value = String((clientIdInput && clientIdInput.value) || "").trim();
     if (value) {
-      rememberClientId(value);
+      const existing = getClientById(value);
+      clientIdInput.dataset.clientEmail = (existing && existing.email) || "";
+      rememberClientId(value, clientIdInput.dataset.clientEmail || "");
       renderClientIdOptions();
+    } else {
+      clientIdInput.dataset.clientEmail = "";
     }
   };
   clientIdInput.addEventListener("input", handleClientIdInput);
@@ -2244,13 +2300,18 @@ const createOrder = async () => {
     const typeInput = row.querySelector('[data-field="type"]');
     const countInput = row.querySelector('[data-field="count"]');
     const clientIdInput = row.querySelector('[data-field="clientId"]');
-    const clientEmailInput = row.querySelector('[data-field="clientEmail"]');
     const linkInput = row.querySelector('[data-field="link"]');
+    const clientId = clientIdInput ? clientIdInput.value.trim() : "";
+    const savedClient = getClientById(clientId);
+    const clientEmail =
+      String((clientIdInput && clientIdInput.dataset && clientIdInput.dataset.clientEmail) || "").trim().toLowerCase() ||
+      (savedClient && savedClient.email) ||
+      "";
     return {
       type: typeInput ? typeInput.value.trim() : "",
       count: Number((countInput && countInput.value) || 0),
-      clientId: clientIdInput ? clientIdInput.value.trim() : "",
-      clientEmail: clientEmailInput ? clientEmailInput.value.trim() : "",
+      clientId,
+      clientEmail,
       link: linkInput ? linkInput.value.trim() : "",
       unitPrice: Number(row.dataset.unitPrice || 0),
     };
@@ -2291,6 +2352,9 @@ const createOrder = async () => {
     const displayName = ensureDatePrefix(item.type, createdAt);
     const amount = Number((item.count * (item.unitPrice || 0)).toFixed(2));
     const clientId = item.clientId || `CLI-${Math.floor(Math.random() * 90000 + 10000)}`;
+    const buyerEmail = String(item.clientEmail || "").trim().toLowerCase();
+    const fallbackEmail = (state.user && state.user.email) || "client@email.com";
+    const clientName = buyerEmail || fallbackEmail;
 
     // Fetch media files if link is provided
     let mediaFiles = null;
@@ -2312,9 +2376,9 @@ const createOrder = async () => {
           totalCount: item.count,
           totalAmount: amount,
           clientId,
-          clientName: item.clientEmail || (state.user && state.user.email) || "client@email.com",
-          clientEmail: item.clientEmail || "",
-          userEmail: (state.user && state.user.email) || "client@email.com",
+          clientName,
+          clientEmail: buyerEmail,
+          userEmail: fallbackEmail,
           items: [{ ...item, sourceLink: item.link }],
         }),
       });
@@ -2338,7 +2402,8 @@ const createOrder = async () => {
           status: data.order.status.toLowerCase(),
           createdAt,
           clientId: data.order.clientId || clientId,
-          clientName: data.order.clientName || (state.user && state.user.email),
+          clientName: data.order.clientName || clientName,
+          clientEmail: data.order.clientEmail || buyerEmail,
           dbId: data.order.id,
         });
       } else {
@@ -2366,7 +2431,8 @@ const createOrder = async () => {
           status: "unpaid",
           createdAt,
           clientId,
-          clientName: item.clientEmail || (state.user && state.user.email) || "client@email.com",
+          clientName,
+          clientEmail: buyerEmail,
         });
       }
     } catch (err) {
@@ -2383,7 +2449,8 @@ const createOrder = async () => {
         status: "unpaid",
         createdAt,
         clientId,
-        clientName: item.clientEmail || (state.user && state.user.email) || "client@email.com",
+        clientName,
+        clientEmail: buyerEmail,
       });
     }
   }
@@ -2845,6 +2912,15 @@ const setupEvents = () => {
       closeClientIdModal();
     }
   });
+  el("newClientEmailInput").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveNewClientId();
+    }
+    if (event.key === "Escape") {
+      closeClientIdModal();
+    }
+  });
 
   el("btnSendInvite").addEventListener("click", async () => {
     const inviteeEmail = (el("referInviteEmail").value || "").trim().toLowerCase();
@@ -2961,7 +3037,7 @@ const syncLocalOrderToDB = async (order) => {
         totalAmount: getOrderAmount(order),
         clientId: order.clientId,
         clientName: order.clientName || (state.user && state.user.email) || "client@email.com",
-        clientEmail: order.clientName || "",
+        clientEmail: order.clientEmail || order.clientName || "",
         userEmail: (state.user && state.user.email) || order.clientName || "client@email.com",
         items: order.items || [],
       }),
@@ -3019,6 +3095,7 @@ const fetchOrdersFromDB = async () => {
           createdAt: new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 16),
           clientId: o.clientId || "",
           clientName: o.clientName || "",
+          clientEmail: o.clientEmail || "",
           dbId: o.id,
         };
       });
@@ -3057,6 +3134,7 @@ const fetchOrdersFromDB = async () => {
               createdAt: new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 16),
               clientId: o.clientId || "",
               clientName: o.clientName || "",
+              clientEmail: o.clientEmail || "",
               dbId: o.id,
             };
           });
