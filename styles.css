@@ -114,7 +114,10 @@ main {
   max-width: 360px;
 }
 
-.login-actions {
+.login-code-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #efe1d2;
   display: grid;
   gap: 8px;
 }

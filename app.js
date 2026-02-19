@@ -1627,6 +1627,10 @@ const clearClientSessionState = () => {
   el("loginScreen").classList.remove("hidden");
   el("appScreen").classList.add("hidden");
   el("userBadge").classList.add("hidden");
+  if (el("loginCode")) {
+    el("loginCode").value = "";
+  }
+  setLoginChallengeActive(false);
 };
 
 const getAuthTokenFromUrl = () => {
@@ -1712,6 +1716,14 @@ const verifyLoginCode = async () => {
   }
 };
 
+const setLoginChallengeActive = (active) => {
+  const panel = el("loginCodePanel");
+  const loginBtn = el("btnLogin");
+  if (!panel || !loginBtn) return;
+  panel.classList.toggle("hidden", !active);
+  loginBtn.textContent = active ? "Resend sign-in link" : "Sign in";
+};
+
 const setupEvents = () => {
   el("btnLogin").addEventListener("click", async () => {
     const email = el("loginEmail").value.trim();
@@ -1722,7 +1734,7 @@ const setupEvents = () => {
 
     const btn = el("btnLogin");
     btn.disabled = true;
-    btn.textContent = "Sending link...";
+    btn.textContent = "Sending sign-in link...";
 
     try {
       const response = await fetch("/api/auth", {
@@ -1734,10 +1746,7 @@ const setupEvents = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert(
-          data.message ||
-            "Sign-in link and code sent. Check your email inbox, then paste the code here if needed."
-        );
+        setLoginChallengeActive(true);
       } else {
         alert(data.hint ? `${data.error || "Sign in failed"}\n${data.hint}` : (data.error || "Sign in failed. Please try again."));
       }
@@ -1747,7 +1756,9 @@ const setupEvents = () => {
     }
 
     btn.disabled = false;
-    btn.textContent = "Send sign-in link";
+    btn.textContent = el("loginCodePanel").classList.contains("hidden")
+      ? "Sign in"
+      : "Resend sign-in link";
   });
 
   el("btnLoginCode").addEventListener("click", verifyLoginCode);
@@ -2207,7 +2218,7 @@ const init = async () => {
   renderPayments();
   renderLineItems();
   setupEvents();
-  el("btnLogin").textContent = "Send sign-in link";
+  setLoginChallengeActive(false);
 
   const authToken = getAuthTokenFromUrl();
   if (authToken) {

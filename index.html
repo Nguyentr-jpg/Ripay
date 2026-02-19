@@ -37,23 +37,26 @@
               <div class="pill">Payment gateway: PayPal + Leaf credits</div>
               <div class="login-card">
                 <h2>Sign in</h2>
-                <p>Enter your email to get a sign-in link and a 6-digit sign-in code.</p>
+                <p>Enter your email to continue.</p>
                 <label class="field">
                   <span>Email</span>
                   <input id="loginEmail" type="email" placeholder="name@email.com" />
                 </label>
-                <label class="field">
-                  <span>Sign-in code (optional)</span>
-                  <input
-                    id="loginCode"
-                    type="text"
-                    inputmode="numeric"
-                    maxlength="6"
-                    placeholder="123456"
-                  />
-                </label>
-                <div class="login-actions">
-                  <button id="btnLogin" class="btn primary">Send sign-in link</button>
+                <button id="btnLogin" class="btn primary">Sign in</button>
+                <div id="loginCodePanel" class="login-code-panel hidden">
+                  <div class="hint" id="loginCodeHint">
+                    Check your email and click the link to sign in automatically, or enter the 6-digit code below.
+                  </div>
+                  <label class="field">
+                    <span>Sign-in code</span>
+                    <input
+                      id="loginCode"
+                      type="text"
+                      inputmode="numeric"
+                      maxlength="6"
+                      placeholder="123456"
+                    />
+                  </label>
                   <button id="btnLoginCode" class="btn ghost">Sign in with code</button>
                 </div>
                 <div class="hint">Free plan: 2 orders/day and up to 10 orders/week.</div>
