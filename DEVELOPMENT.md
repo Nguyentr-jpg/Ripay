@@ -8,6 +8,9 @@
 
 ## ✅ Completed Setup
 
+### DB Sync Rule
+- Use [`SUPABASE_DEV_LOOP.md`](SUPABASE_DEV_LOOP.md) as mandatory workflow for any feature touching database/schema/RLS.
+
 ### 1. **Database - Supabase PostgreSQL**
 
 **Connection:**
