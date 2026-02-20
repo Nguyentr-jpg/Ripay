@@ -969,6 +969,16 @@ main {
   color: var(--muted);
 }
 
+.plan-action-btn {
+  margin-top: 14px;
+  width: 100%;
+}
+
+.plan-action-btn:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+
 .plan-title {
   font-weight: 700;
 }

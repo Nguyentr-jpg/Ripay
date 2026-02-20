@@ -461,17 +461,38 @@ async function handleGet(req, res) {
       success: true,
       subscription: null,
       tier: "free",
+      subscriptionState: "free",
       planFeatures: freeFeatures,
       usage: { ordersToday: 0, ordersThisWeek: 0 },
     });
   }
 
   const planState = await buildPlanStateForUser(user.id);
+  const latestSubscription = await getPrisma().subscription.findFirst({
+    where: { userId: user.id },
+    orderBy: [{ expiresAt: "desc" }, { createdAt: "desc" }],
+  });
+
+  let subscriptionState = "free";
+  if (planState.subscription) {
+    const status = String(planState.subscription.status || "").toLowerCase();
+    subscriptionState = status === "canceled" ? "canceled" : "active";
+  } else if (latestSubscription) {
+    const expired = new Date(latestSubscription.expiresAt).getTime() <= Date.now();
+    if (expired) {
+      subscriptionState = "expired";
+    } else {
+      const latestStatus = String(latestSubscription.status || "").toLowerCase();
+      subscriptionState = latestStatus === "canceled" ? "canceled" : "active";
+    }
+  }
 
   return res.status(200).json({
     success: true,
     subscription: planState.subscription,
     tier: planState.tier,
+    subscriptionState,
+    latestSubscription,
     planFeatures: planState.planFeatures,
     usage: planState.usage,
   });
