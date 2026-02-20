@@ -50,6 +50,8 @@ const state = {
     open: false,
   },
   currentPlanCode: "free",
+  subscriptionStatus: "",
+  subscriptionExpiresAt: "",
   userMenuOpen: false,
   lang: "en",
 };
@@ -164,6 +166,10 @@ const I18N = {
     upgradeTitle: "Upgrade plan",
     upgradeSub: "Choose Free, Personal, or Business for your workspace.",
     currentPlanLabel: "Current plan:",
+    cancelPlanNotice: "Cancellation scheduled. Your plan stays active until {date}.",
+    btnCancelPlan: "Cancel plan",
+    btnCancelingPlan: "Canceling...",
+    btnCancelPlanScheduled: "Cancellation scheduled",
     cycleMonthly: "Monthly billing",
     cycleAnnual: "Annual billing",
     planFreeTitle: "Free",
@@ -269,6 +275,9 @@ const I18N = {
       "Subscription activated. Referral bonus applied (+1 month for both users).",
     alertSubscriptionActivated: "Subscription activated via PayPal.",
     alertSubscriptionFailed: "Subscription failed.",
+    alertCancelPlanConfirm: "Cancel auto-renew now? You will keep access until {date}.",
+    alertSubscriptionCanceled: "Auto-renew canceled. Your plan remains active until {date}.",
+    alertSubscriptionCancelFailed: "Could not cancel subscription.",
     hintSubscriptionNeedSignIn: "Please sign in before starting a subscription.",
     hintSubscriptionFreeActive: "Free plan is active instantly. Paid checkout is not required.",
     hintSubscriptionLoadingCheckout: "Loading PayPal subscription checkout...",
@@ -407,6 +416,10 @@ const I18N = {
     upgradeTitle: "Nâng cấp gói",
     upgradeSub: "Chọn Free, Personal hoặc Business cho workspace.",
     currentPlanLabel: "Gói hiện tại:",
+    cancelPlanNotice: "Đã lên lịch hủy. Gói vẫn hoạt động đến {date}.",
+    btnCancelPlan: "Hủy gói",
+    btnCancelingPlan: "Đang hủy...",
+    btnCancelPlanScheduled: "Đã lên lịch hủy",
     cycleMonthly: "Thanh toán theo tháng",
     cycleAnnual: "Thanh toán theo năm",
     planFreeTitle: "Free",
@@ -512,6 +525,11 @@ const I18N = {
       "Đăng ký gói thành công. Đã cộng thưởng giới thiệu (+1 tháng cho cả hai).",
     alertSubscriptionActivated: "Đăng ký gói qua PayPal thành công.",
     alertSubscriptionFailed: "Đăng ký gói thất bại.",
+    alertCancelPlanConfirm:
+      "Xác nhận hủy gia hạn tự động? Bạn vẫn dùng đến {date}.",
+    alertSubscriptionCanceled:
+      "Đã hủy gia hạn tự động. Gói vẫn hoạt động đến {date}.",
+    alertSubscriptionCancelFailed: "Không thể hủy gói.",
     hintSubscriptionNeedSignIn: "Vui lòng đăng nhập trước khi bắt đầu đăng ký gói.",
     hintSubscriptionFreeActive: "Gói Free được kích hoạt ngay, không cần checkout trả phí.",
     hintSubscriptionLoadingCheckout: "Đang tải checkout đăng ký PayPal...",
@@ -650,6 +668,7 @@ const applyLanguage = () => {
   setText("upgradeTitle", "upgradeTitle");
   setText("upgradeSub", "upgradeSub");
   setText("currentPlanLabel", "currentPlanLabel");
+  setText("btnCancelPlan", "btnCancelPlan");
   setText("cycleMonthly", "cycleMonthly");
   setText("cycleAnnual", "cycleAnnual");
   setText("planFreeTitle", "planFreeTitle");
@@ -769,6 +788,7 @@ const applyLanguage = () => {
   setLoginChallengeActive(!el("loginCodePanel").classList.contains("hidden"));
   updatePlanBadge();
   updateCurrentPlanDisplay();
+  updateCancelPlanUi();
   renderOrders();
   renderPayments();
   renderNotifications();
@@ -843,6 +863,8 @@ const loadState = () => {
     state.subscribed = Boolean(data.subscribed);
     state.planTier = data.planTier || "free";
     state.currentPlanCode = data.currentPlanCode || state.planTier || "free";
+    state.subscriptionStatus = data.subscriptionStatus || "";
+    state.subscriptionExpiresAt = data.subscriptionExpiresAt || "";
     state.leafBalance = Number(data.leafBalance || 0);
   } catch (err) {
     console.error(err);
@@ -870,6 +892,8 @@ const saveState = () => {
     subscribed: state.subscribed,
     planTier: state.planTier,
     currentPlanCode: state.currentPlanCode,
+    subscriptionStatus: state.subscriptionStatus,
+    subscriptionExpiresAt: state.subscriptionExpiresAt,
     leafBalance: state.leafBalance,
   };
 
@@ -919,6 +943,12 @@ const parseSubscriptionPlan = (planCode, fallbackTier = "free") => {
   return { tier, cycle };
 };
 
+const formatLocalDate = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString(state.lang === "vi" ? "vi-VN" : "en-US");
+};
+
 const updateCurrentPlanDisplay = () => {
   const node = el("currentPlanValue");
   if (!node) return;
@@ -929,6 +959,39 @@ const updateCurrentPlanDisplay = () => {
     return;
   }
   node.textContent = `${planLabel} (${parsed.cycle === "annual" ? t("cycleAnnual") : t("cycleMonthly")})`;
+};
+
+const updateCancelPlanUi = () => {
+  const wrap = el("cancelPlanWrap");
+  const btn = el("btnCancelPlan");
+  const note = el("cancelPlanNotice");
+  if (!wrap || !btn || !note) return;
+
+  const parsed = parseSubscriptionPlan(state.currentPlanCode, state.planTier);
+  const isPaid = parsed.tier === "personal" || parsed.tier === "business";
+  const isScheduled = String(state.subscriptionStatus || "").toLowerCase() === "canceled";
+  const hasExpiry = Boolean(state.subscriptionExpiresAt);
+
+  wrap.classList.toggle("hidden", !isPaid);
+
+  if (!isPaid) {
+    note.classList.add("hidden");
+    btn.disabled = true;
+    btn.textContent = t("btnCancelPlan");
+    return;
+  }
+
+  if (isScheduled && hasExpiry) {
+    note.classList.remove("hidden");
+    note.textContent = t("cancelPlanNotice", { date: formatLocalDate(state.subscriptionExpiresAt) });
+    btn.disabled = true;
+    btn.textContent = t("btnCancelPlanScheduled");
+    return;
+  }
+
+  note.classList.add("hidden");
+  btn.disabled = false;
+  btn.textContent = t("btnCancelPlan");
 };
 
 const syncUpgradeSelectionFromCurrentPlan = () => {
@@ -1834,10 +1897,14 @@ const fetchSubscriptionStatus = async () => {
     state.currentPlanCode = data.subscription && data.subscription.plan
       ? String(data.subscription.plan)
       : String(state.planTier || "free");
+    state.subscriptionStatus = data.subscription && data.subscription.status ? String(data.subscription.status) : "";
+    state.subscriptionExpiresAt =
+      data.subscription && data.subscription.expiresAt ? String(data.subscription.expiresAt) : "";
     state.planFeatures = data.planFeatures || null;
     state.usage = data.usage || { ordersToday: 0, ordersThisWeek: 0 };
     updatePlanBadge();
     updateCurrentPlanDisplay();
+    updateCancelPlanUi();
     saveState();
     renderStats();
   } catch (err) {
@@ -2078,6 +2145,16 @@ const renderPayPalSubscriptionButton = async () => {
     return;
   }
 
+  const currentParsed = parseSubscriptionPlan(state.currentPlanCode, state.planTier);
+  if (
+    String(state.subscriptionStatus || "").toLowerCase() === "canceled" &&
+    currentParsed.tier === tier
+  ) {
+    container.innerHTML = "";
+    hint.textContent = "";
+    return;
+  }
+
   hint.textContent = t("hintSubscriptionLoadingCheckout");
 
   try {
@@ -2176,6 +2253,7 @@ const openSubscriptionModal = async () => {
   await fetchSubscriptionStatus();
   syncUpgradeSelectionFromCurrentPlan();
   updateCurrentPlanDisplay();
+  updateCancelPlanUi();
   updateUpgradePricing();
   el("subModal").classList.remove("hidden");
   await renderPayPalSubscriptionButton();
@@ -2621,6 +2699,9 @@ const applyAuthenticatedSession = async (data) => {
     data.subscription && data.subscription.plan
       ? String(data.subscription.plan)
       : String(state.planTier || "free");
+  state.subscriptionStatus = data.subscription && data.subscription.status ? String(data.subscription.status) : "";
+  state.subscriptionExpiresAt =
+    data.subscription && data.subscription.expiresAt ? String(data.subscription.expiresAt) : "";
   state.planFeatures = data.planFeatures || null;
   state.usage = data.usage || { ordersToday: 0, ordersThisWeek: 0 };
   showApp(data.user);
@@ -2640,6 +2721,8 @@ const clearClientSessionState = () => {
   state.subscribed = false;
   state.planTier = "free";
   state.currentPlanCode = "free";
+  state.subscriptionStatus = "";
+  state.subscriptionExpiresAt = "";
   state.planFeatures = null;
   state.usage = { ordersToday: 0, ordersThisWeek: 0 };
   state.referral = { stats: { total: 0, pending: 0, rewarded: 0 }, invites: [] };
@@ -3010,6 +3093,57 @@ const setupEvents = () => {
 
   el("btnCloseSub").addEventListener("click", () => {
     closeSubscriptionModal();
+  });
+
+  el("btnCancelPlan").addEventListener("click", async () => {
+    if (!state.user || !state.user.email) {
+      alert(t("alertSignInFirst"));
+      return;
+    }
+
+    const plannedEnd = state.subscriptionExpiresAt || "";
+    const confirmed = window.confirm(
+      t("alertCancelPlanConfirm", { date: formatLocalDate(plannedEnd) })
+    );
+    if (!confirmed) return;
+
+    const btn = el("btnCancelPlan");
+    btn.disabled = true;
+    btn.textContent = t("btnCancelingPlan");
+
+    try {
+      const response = await fetch("/api/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "cancel_subscription",
+          email: state.user.email,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || data.hint || t("alertSubscriptionCancelFailed"));
+      }
+
+      await fetchSubscriptionStatus();
+      await fetchNotificationsFromDB();
+      alert(
+        t("alertSubscriptionCanceled", {
+          date: formatLocalDate(
+            (data.canceled && data.canceled.expiresAt) || state.subscriptionExpiresAt
+          ),
+        })
+      );
+
+      if (!el("subModal").classList.contains("hidden")) {
+        await renderPayPalSubscriptionButton();
+      }
+      updateCancelPlanUi();
+    } catch (error) {
+      console.error("Cancel subscription failed:", error);
+      alert(error.message || t("alertSubscriptionCancelFailed"));
+      updateCancelPlanUi();
+    }
   });
 
   el("btnOpenUpgrade").addEventListener("click", async () => {

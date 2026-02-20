@@ -190,6 +190,37 @@ async function fetchPayPalSubscription(subscriptionId) {
   return data;
 }
 
+async function cancelPayPalSubscription(subscriptionId, reason = "Canceled by user at period end.") {
+  const accessToken = await getPayPalAccessToken();
+  const response = await fetch(
+    `${getPayPalBaseUrl()}/v1/billing/subscriptions/${subscriptionId}/cancel`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ reason }),
+    }
+  );
+
+  if (response.status === 204) {
+    return { success: true };
+  }
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch (error) {
+    data = null;
+  }
+  const detail =
+    (data && Array.isArray(data.details) && data.details[0] && data.details[0].description) ||
+    (data && data.message) ||
+    "Failed to cancel PayPal subscription.";
+  throw new Error(detail);
+}
+
 async function getOrCreateUserByEmail(email) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
@@ -235,9 +266,9 @@ async function getCurrentActiveSubscriptions(userId) {
   return getPrisma().subscription.findMany({
     where: {
       userId,
-      status: "active",
+      status: { in: ["active", "canceled"] },
       startedAt: { lte: now },
-      OR: [{ expiresAt: { gt: now } }, { gateway: "PAYPAL" }],
+      expiresAt: { gt: now },
     },
     orderBy: [{ expiresAt: "desc" }, { createdAt: "desc" }],
   });
@@ -472,9 +503,9 @@ async function handleCancelSubscription(req, res) {
   const current = await getPrisma().subscription.findFirst({
     where: {
       userId: user.id,
-      status: "active",
+      status: { in: ["active", "canceled"] },
       startedAt: { lte: new Date() },
-      OR: [{ expiresAt: { gt: new Date() } }, { gateway: "PAYPAL" }],
+      expiresAt: { gt: new Date() },
     },
     orderBy: [{ expiresAt: "desc" }, { createdAt: "desc" }],
   });
@@ -483,11 +514,40 @@ async function handleCancelSubscription(req, res) {
     return res.status(200).json({ success: true, canceled: null, message: "No active subscription." });
   }
 
+  if (String(current.status || "").toLowerCase() === "canceled") {
+    return res.status(200).json({
+      success: true,
+      canceled: current,
+      message: "Cancellation already scheduled.",
+      effectiveUntil: current.expiresAt,
+    });
+  }
+
+  if (current.gateway === "PAYPAL" && current.gatewaySubscriptionId) {
+    await cancelPayPalSubscription(current.gatewaySubscriptionId);
+  }
+
+  let effectiveUntil = current.expiresAt;
+  if (current.gateway === "PAYPAL" && current.gatewaySubscriptionId) {
+    try {
+      const details = await fetchPayPalSubscription(current.gatewaySubscriptionId);
+      const nextBillingFromPayPal = parseDate(
+        details.billing_info && details.billing_info.next_billing_time,
+        current.expiresAt
+      );
+      if (nextBillingFromPayPal && new Date(nextBillingFromPayPal).getTime() > Date.now()) {
+        effectiveUntil = nextBillingFromPayPal;
+      }
+    } catch (error) {
+      console.error("Could not refresh PayPal next billing time after cancellation:", error);
+    }
+  }
+
   const canceled = await getPrisma().subscription.update({
     where: { id: current.id },
     data: {
       status: "canceled",
-      expiresAt: new Date(),
+      expiresAt: effectiveUntil,
       nextBillingAt: null,
     },
   });
@@ -506,7 +566,7 @@ async function handleCancelSubscription(req, res) {
     console.error("Subscription cancel email failed:", error);
   }
 
-  return res.status(200).json({ success: true, canceled });
+  return res.status(200).json({ success: true, canceled, effectiveUntil: canceled.expiresAt });
 }
 
 async function handleActivatePayPal(req, res) {
@@ -578,6 +638,8 @@ async function handleActivatePayPal(req, res) {
       },
       data: {
         status: "canceled",
+        expiresAt: now,
+        nextBillingAt: null,
       },
     });
 

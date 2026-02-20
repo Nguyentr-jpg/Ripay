@@ -936,6 +936,17 @@ main {
   font-size: 14px;
 }
 
+.upgrade-cancel-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.upgrade-cancel-wrap .hint {
+  margin-top: 0;
+}
+
 .cycle-btn {
   border: 1px solid var(--border);
   border-radius: 10px;
